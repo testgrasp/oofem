@@ -963,6 +963,10 @@ public:
     FloatMatrixF< 2, 2 >computeDDGDDInv(double sig,
                                         double rho,
                                         double tempKappa) const;
+    
+    FloatMatrixF<6,6> computeDDGDDStress(const FloatArrayF<6> &stress, 
+					 const double tempKappa) const;
+    
     /**
      * 1D: The second derivative of the plastic potential with respect to the
      * invariants sig and rho are computed.
@@ -1020,6 +1024,18 @@ public:
                                   double theta,
                                   double tempKappa) const;
 
+    FloatArrayF<6> computeDFDStress(const FloatArrayF<6>& stress,
+				    const double tempKappa) const;
+
+    FloatArrayF<6> computeDGDStress(const FloatArrayF<6>& stress, 
+				    const double tempKappa) const;
+      
+    FloatMatrixF<7,7> computeFullJacobian(const FloatArrayF<6>& stress, 
+					  const double deltaLambda,
+					  GaussPoint* gp, 
+					  TimeStep* atTime,
+					  const double tempKappa);
+    
     /**
      * 1D: Computes the derivative of the yield surface with respect to the
      * invariants sig and rho.
@@ -1089,15 +1105,9 @@ public:
     /// Computes the derivative of sig with respect to the stress.
     FloatArrayF< 6 >computeDSigDStress() const;
 
-    /// Computes the seconfd derivative of rho with the respect to the stress.
-    FloatMatrixF< 3, 3 >computeDDRhoDDStress(const FloatArrayF< 6 > &stress) const;
+    /// Computes the second derivative of rho with the respect to the stress.
+    FloatMatrixF<6,6> computeDDRhoDDStress(const FloatArrayF<6> &stress) const;
 
-    /// Computes the derivative of costheta with respect to the stress.
-    void computeDCosThetaDStress(FloatArray &answer,
-                                 const FloatArray &stress) const;
-
-    /// Compute the derivative of R with respect to costheta.
-    double computeDRDCosTheta(double theta, double ecc) const;
 
     FloatMatrixF< 1, 1 >give1dStressStiffMtrx(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const override;
 

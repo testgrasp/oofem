@@ -2222,7 +2222,218 @@ ConcreteDPM2::computeDGDInv(double sig,
                dgdsig, dgdrho
     };
 }
+  
+//New implementation for computing tangent stiffness
+  
+  FloatArrayF<6>
+  ConcreteDPM2::computeDFDStress(const FloatArrayF<6> &stress, 
+				 double tempKappa) const
+{
+  auto tmp = computeDeviatoricVolumetricSplit(stress);
+  auto deviatoricStress = tmp.first;
+  double sig = tmp.second;
 
+  double rho = computeSecondCoordinate(deviatoricStress);
+  double theta = computeThirdCoordinate(deviatoricStress);
+
+  //compute dFDRho*dRhoDStress + dFDR*dRDStress
+  auto dFDInv = computeDFDInv(sig, rho, theta, tempKappa);
+  auto dSigDStress = computeDSigDStress();  
+  auto dRhoDStress = computeDRhoDStress(stress);
+
+  dSigDStress*dFDInv.at(1);  
+  dRhoDStress*dFDInv.at(2); 
+  dSigDStress+=dRhoDStress;
+
+  return dSigDStress;
+}
+
+FloatArrayF<6>
+ConcreteDPM2::computeDGDStress(const FloatArrayF<6> &stress, const double tempKappa) const
+{
+
+  auto tmp = computeDeviatoricVolumetricSplit(stress);
+  auto deviatoricStress = tmp.first;
+  double sig = tmp.second;
+  
+  double rho = computeSecondCoordinate(deviatoricStress);
+  double theta = computeThirdCoordinate(deviatoricStress);
+
+  //compute dGDSig*dSigDStress + dGDRho*dRhoDStress
+  auto dGDInv = computeDGDInv(sig, rho, tempKappa);
+  auto dSigDStress = computeDSigDStress();  
+  auto dRhoDStress = computeDRhoDStress(stress);
+
+  dSigDStress*dGDInv.at(1);  
+  dRhoDStress*dGDInv.at(2); 
+  dSigDStress+=dRhoDStress;
+
+  return dSigDStress;
+}
+  
+  FloatMatrixF<6,6> 
+  ConcreteDPM2::computeDDRhoDDStress(const FloatArrayF<6> &stress) const
+{
+  
+  auto tmp = computeDeviatoricVolumetricSplit(stress);
+  auto deviatoricStress = tmp.first;
+  
+  double rho = computeSecondCoordinate(deviatoricStress);
+
+  //compute the derivative of J2 with respect to the stress
+  FloatArrayF<6> dJ2DStress = deviatoricStress;
+  for (int i = 3; i < 6;i++){
+    dJ2DStress.at(i+1) *= 2.;
+  }
+
+  //compute second derivative of J2
+  FloatMatrixF<6,6> dDJ2DDStress;
+  for ( int i = 0; i < 6; i++){
+    if(i < 3){
+      dDJ2DDStress(i,i) = 2./3.;
+    }
+    else{
+      dDJ2DDStress(i,i) = 2.;
+    }
+  }
+  dDJ2DDStress(0,1) = -1./3.; 
+  dDJ2DDStress(0,2) = -1./3.; 
+  dDJ2DDStress(1,0) = -1./3.; 
+  dDJ2DDStress(1,2) = -1./3.; 
+  dDJ2DDStress(2,0) = -1./3.; 
+  dDJ2DDStress(2,1) = -1./3.; 
+  
+  //compute square of the first derivative of J2
+  FloatMatrixF<6,6> dJ2DJ2;
+  for (int v = 0; v < 6; v++ ){
+    for(int w = 0; w < 6; ++w ){
+      dJ2DJ2.at(v+1,w+1) = dJ2DStress.at(v+1)*dJ2DStress.at(w+1);
+    }
+  }
+
+  //compute the second derivative of rho
+  FloatMatrixF<6,6> dDRhoDDStress = dDJ2DDStress;
+  dDRhoDDStress*(1./rho);
+  FloatMatrixF<6,6> help1 = dJ2DJ2;
+  help1*(-1./(rho*rho*rho));
+  dDRhoDDStress+=help1; 
+  return dDRhoDDStress;
+}
+  
+
+FloatMatrixF<7,7>
+ConcreteDPM2::computeFullJacobian(const FloatArrayF<6>& stress, 
+				  const double deltaLambda,
+				  GaussPoint* gp, 
+				  TimeStep* atTime,
+				  const double tempKappa)
+{
+  //Variables
+
+  FloatMatrixF<7,7> jacobian;
+
+
+  auto dFDStress = computeDFDStress(stress, tempKappa);
+  auto dGDStress = computeDGDStress(stress, tempKappa);
+  auto dDGDDStress = computeDDGDDStress(stress, tempKappa);
+  auto elasticStiffness = this->linearElasticMaterial.give3dMaterialStiffnessMatrix(ElasticStiffness, gp, atTime);
+  FloatMatrixF<6,6> compliance = inv(elasticStiffness);
+  
+  //Assign jacobian
+  for(int i= 0; i<6; i++){
+    for(int j = 0; j<6; j++){
+      jacobian.at(i+1,j+1) = compliance.at(i+1,j+1) + deltaLambda*dDGDDStress.at(i+1,j+1);
+    }
+  } 
+  for(int i = 0; i<6;i++){
+    jacobian.at(i+1,7) = dGDStress.at(i+1);
+  }
+  for(int i = 0; i<6;i++){
+    jacobian.at(7,i+1) = dFDStress.at(i+1);
+  }
+
+  jacobian.at(7,7) = 0.;
+  
+  return jacobian;
+}
+  
+  
+  FloatMatrixF<6,6>
+  ConcreteDPM2::computeDDGDDStress(const FloatArrayF<6> &stress, 
+				   const double tempKappa) const
+{
+  FloatMatrixF<6,6> answer;
+  
+  auto tmp = computeDeviatoricVolumetricSplit(stress);
+  auto deviatoricStress = tmp.first;
+  
+  double rho = computeSecondCoordinate(deviatoricStress);
+  double theta = computeThirdCoordinate(deviatoricStress);
+
+  // //compute eccentricity function and its derivatives
+  // double rFunction = computeRFunction(theta, eccPotential);
+  // double dRDCosTheta = computeDRDCosTheta(theta, eccPotential);
+  // double dDRDDCosTheta = computeDDRDDCosTheta(theta, eccPotential);
+
+  // //compute the derivatives of G with respect to the coordinates
+  // double dGDRho = rFunction*sqrt(3./2.)/fc;
+  // double dDGDDRho = 0.;
+  // double dGDCosTheta = dRDCosTheta*rho*sqrt(3./2.)/fc;
+  // double dDGDDCosTheta = dDRDDCosTheta*rho*sqrt(3./2.)/fc;
+  // double dDGDRhoDCosTheta = dRDCosTheta*sqrt(3./2.)/fc;
+  // double dDGDCosThetaDRho = dDGDRhoDCosTheta;
+
+  // //compute the derivatives of the coordinates with respect to the stress
+  // auto dRhoDStress =  computeDRhoDStress(stress);
+  // auto dDRhoDDStress = computeDDRhoDDStress(stress, gp);
+  
+  // //compute dRhoDStress * mixed terms
+  // FloatArrayF<6> temp1;
+  // temp1 = dRhoDStress;
+  // temp1.times(dDGDDRho);
+  // FloatArrayF<6> temp1A;
+  // temp1A = dCosThetaDStress;
+  // temp1A.times(dDGDRhoDCosTheta);
+  // temp1.add(temp1A);
+  // FloatMatrixF<6,6> helpA;
+  // for (int v = 0; v < 6; v++ ){
+  //   for(int w = 0; w < 6; ++w ){
+  //     helpA.at(v+1,w+1) = dRhoDStress.at(v+1)*temp1.at(w+1);
+  //   }
+  // }
+
+  // //compute dDDRho * dDRhoDDStress
+  // FloatMatrixF<6,6> helpB = dDRhoDDStress;
+  // helpB.times(dGDRho);
+
+  // //compute dcosThetaDStress * mixed terms
+  // FloatArray temp2;
+  // temp2 = dRhoDStress;
+  // temp2.times(dDGDCosThetaDRho);
+  // FloatArray temp2A;
+  // temp2A = dCosThetaDStress;
+  // temp2A.times(dDGDDCosTheta);
+  // temp2.add(temp2A);
+  // FloatMatrix helpC(size, size);
+  // for (int v = 0; v < 6; v++ ){
+  //   for(int w = 0; w < 6; ++w ){
+  //     helpC.at(v+1,w+1) = dCosThetaDStress.at(v+1)*temp2.at(w+1);
+  //   }
+  // }
+
+  // //compute dGDTheta * dDThetaDDStress
+  // FloatMatrixF<6,6> helpD;
+  // helpD = dDCosThetaDDStress;
+  // helpD.times(dGDCosTheta);
+
+  // //sum up all parts
+  // answer = helpA;
+  // answer.plus(helpB);
+  // answer.plus(helpC);
+  // answer.plus(helpD);
+  return answer;
+}
+  
 double
 ConcreteDPM2::computeDDGDInvDKappa1d(double sigma,
                                      double tempKappa) const
@@ -2661,40 +2872,42 @@ ConcreteDPM2::computeDSigDStress() const
 }
 
 
-FloatMatrixF< 3, 3 >
-ConcreteDPM2::computeDDRhoDDStress(const FloatArrayF< 6 > &stress) const
-{
-    //compute volumetric deviatoric split
-    auto deviatoricStress = computeDeviator(stress);
-    double rho = computeSecondCoordinate(deviatoricStress);
+// FloatMatrixF<6,6>
+// ConcreteDPM2 :: computeDDRhoDDStress(const FloatArrayF<6> &stress) const
+// {
+//   FloatMatrixF<6,6> answer;
+  // //compute volumetric deviatoric split
+  //   auto deviatoricStress = computeDeviator(stress);
+  //   double rho = computeSecondCoordinate(deviatoricStress);
 
-    //compute first dericative of J2
-    auto dJ2dstress = deviatoricStress;
-    for ( int i = 3; i < 6; i++ ) {
-        dJ2dstress [ i ] = deviatoricStress [ i ] * 2.;
-    }
+  //   //compute first dericative of J2
+  //   auto dJ2dstress = deviatoricStress;
+  //   for ( int i = 3; i < 6; i++ ) {
+  //       dJ2dstress[i] = deviatoricStress[i] * 2.;
+  //   }
 
-    //compute second derivative of J2
-    FloatMatrixF< 3, 3 >ddJ2ddstress;
-    for ( int i = 0; i < 6; i++ ) {
-        if ( i < 3 ) {
-            ddJ2ddstress(i, i) = 2. / 3.;
-        }
+  //   //compute second derivative of J2
+  //   FloatMatrixF<3,3> ddJ2ddstress;
+  //   for ( int i = 0; i < 6; i++ ) {
+  //       if ( i < 3 ) {
+  //           ddJ2ddstress(i, i) = 2. / 3.;
+  //       }
 
-        if ( i > 2 ) {
-            ddJ2ddstress(i, i) = 2.;
-        }
-    }
+  //       if ( i > 2 ) {
+  //           ddJ2ddstress(i, i) = 2.;
+  //       }
+  //   }
 
-    ddJ2ddstress(0, 1) = -1. / 3.;
-    ddJ2ddstress(0, 2) = -1. / 3.;
-    ddJ2ddstress(1, 0) = -1. / 3.;
-    ddJ2ddstress(1, 2) = -1. / 3.;
-    ddJ2ddstress(2, 0) = -1. / 3.;
-    ddJ2ddstress(2, 1) = -1. / 3.;
+  //   ddJ2ddstress(0, 1) = -1. / 3.;
+  //   ddJ2ddstress(0, 2) = -1. / 3.;
+  //   ddJ2ddstress(1, 0) = -1. / 3.;
+  //   ddJ2ddstress(1, 2) = -1. / 3.;
+  //   ddJ2ddstress(2, 0) = -1. / 3.;
+  //   ddJ2ddstress(2, 1) = -1. / 3.;
 
-    return ddJ2ddstress * ( 1. / rho ) + dyad(dJ2dstress, dJ2dstress) * ( -1. / ( rho * rho * rho ) );
-}
+  //   return ddJ2ddstress * (1. / rho) + dyad(dJ2dstress, dJ2dstress) * (-1. / ( rho * rho * rho ) );
+//   return answer;
+// }
 
 int
 ConcreteDPM2::giveIPValue(FloatArray &answer,
