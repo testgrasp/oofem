@@ -43,6 +43,7 @@
 //@{
 #define _IFT_LatticeDamage_Name "latticedamage"
 #define _IFT_LatticeDamage_softeningType "stype"
+#define _IFT_LatticeDamage_equivType "etype"
 #define _IFT_LatticeDamage_wf "wf"
 #define _IFT_LatticeDamage_wfOne "wf1"
 #define _IFT_LatticeDamage_e0Mean "e0"
@@ -149,13 +150,19 @@ protected:
     double ftMean = 0.;
     double ftOneMean = 0.;
 
-    /**parameter which determines the typ of the softeningFunction
+    /**parameter which determines the type of the softening function
      * 1 = linear softening
      * 2 = bilinear softening
      * 3 = exponential softening
      **/
     int softeningType = 0.;
 
+    /**parameter which determines the type of the equivalent strain function
+     * 1 = ellipse surface
+     * 2 = open surface 
+     **/
+    int equivType = 0.;
+    
     /// determines the softening -> corresponds to crack opening when tension stress vanishes
     double wf = 0., wfOne = 0.;
 

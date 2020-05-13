@@ -80,12 +80,20 @@ LatticeDamage :: initializeFrom(InputRecord &ir)
 
     IR_GIVE_OPTIONAL_FIELD(ir, e0Mean, _IFT_LatticeDamage_e0Mean); // Macro
 
-    this->coh = 2.;
-    IR_GIVE_OPTIONAL_FIELD(ir, coh, _IFT_LatticeDamage_coh); // Macro
+    this->equivType = 1;
+    IR_GIVE_OPTIONAL_FIELD(ir, equivType, _IFT_LatticeDamage_equivType); // Macro
 
-    this->ec = 10.;
+    if(this->equivType == 1){//equiv = 1 is OK for tension
+      this->coh = 2.;
+      this->ec = 10.;
+    }
+    else {//equiv = 2 for tension and compression
+      this->coh = 1.3;
+      this->ec = 1.;
+    }
+    IR_GIVE_OPTIONAL_FIELD(ir, coh, _IFT_LatticeDamage_coh); // Macro      
     IR_GIVE_OPTIONAL_FIELD(ir, ec, _IFT_LatticeDamage_ec); // Macro
-
+          
     this->biotCoefficient = 0.;
     IR_GIVE_OPTIONAL_FIELD(ir, this->biotCoefficient, _IFT_LatticeDamage_bio);
 
@@ -97,13 +105,19 @@ LatticeDamage :: initializeFrom(InputRecord &ir)
 double
 LatticeDamage :: computeEquivalentStrain(const FloatArrayF< 6 > &strain, GaussPoint *gp) const
 {
+  double shearNorm = norm(strain [ { 1, 2 } ]);
+  
+  if(this->equivType == 1){//ellipse for tension
     const double e0 = this->give(e0_ID, gp) * this->e0Mean;
     double paramA = 0.5 * ( e0 + ec * e0 );
     double paramB = ( coh * e0 ) / sqrt(1. - pow( ( ec * e0 - e0 ) / ( e0 + ec * e0 ), 2. ) );
     double paramC = 0.5 * ( this->ec * e0 - e0 );
-
-    double shearNorm = norm(strain [ { 1, 2 } ]);
     return norm({ this->alphaOne * shearNorm / paramB, ( strain.at(1) + paramC ) / paramA }) * paramA - paramC;
+  }
+  else {//Amrit's equiv strain formulation
+    return 0.5 * strain.at(1) * (1 + pow(this->ec/this->coh,2.)) + (1 / (2 * pow(this->coh,2.))) * sqrt(pow(pow(this->coh,2) - pow(this->ec,2.),2.) * pow(strain.at(1), 2.) + 4 * pow(this->coh,2.) * pow(shearNorm,2.));    
+  }
+    
 }
 
 
