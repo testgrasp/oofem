@@ -127,6 +127,8 @@ protected:
 
     double kappaPPeak = 0.;
 
+    double deltaLambda = 0.;
+    
     double le = 0.;
 
     double alpha = 0.;
@@ -390,6 +392,9 @@ public:
     double giveTempKappaP() const
     { return tempKappaP; }
 
+    double giveDeltaLambda() const
+    { return deltaLambda; }
+    
     /**
      * Get the temp value of the hardening variable of the damage model
      * from the material status.
@@ -465,6 +470,9 @@ public:
     void letTempKappaPBe(double v)
     { tempKappaP = v; }
 
+    void letDeltaLambdaBe(double v)
+    { deltaLambda = v; }
+    
     /**
      * Assign the temp value of the rate factor of the damage model.
      * @param v New temp value of the damage variable
@@ -947,6 +955,11 @@ public:
                                                    double rho,
                                                    double theta,
                                                    double tempKappa) const;
+
+    FloatArrayF<6> computeDDKappaDDeltaLambdaDStress(const FloatArrayF< 6 > &stress, double tempKappa) const;
+
+    FloatArrayF< 6 > computeDDGDStressDKappa(const FloatArrayF< 6 > &stress, double tempKappa) const;
+    
     /**
      * Computes the derivative of the evolution law of the hardening parameter kappa with respect to the hardening variable kappa.
      */
@@ -968,11 +981,11 @@ public:
     FloatArrayF< 6 >computeDGDStress(const FloatArrayF< 6 > &stress,
                                      const double tempKappa) const;
 
-    FloatMatrixF< 7, 7 >computeFullJacobian(const FloatArrayF< 6 > &stress,
+    FloatMatrixF< 8, 8 >computeFullJacobian(const FloatArrayF< 6 > &stress,
                                             const double deltaLambda,
                                             GaussPoint *gp,
                                             TimeStep *atTime,
-                                            const double tempKappa);
+                                            const double tempKappa) const;
     /// Compute tempKappa.
     double computeTempKappa(double kappaInitial,
                             double sigTrial,
@@ -1033,11 +1046,17 @@ public:
     /// Computes the second derivative of rho with the respect to the stress.
     FloatMatrixF< 6, 6 >computeDDRhoDDStress(const FloatArrayF< 6 > &stress) const;
 
+    /// Computes the second derivative of rho with the respect to the stress the old way.
+    FloatMatrixF< 6, 6 >computeDDRhoDDStressOld(const FloatArrayF< 6 > &stress) const;
+
+    
     FloatMatrixF< 6, 6 >give3dMaterialStiffnessMatrix(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const override;
 
     /// Compute the 3d secant stiffness matrix.
     FloatMatrixF< 6, 6 >compute3dSecantStiffness(GaussPoint *gp, TimeStep *tStep) const;
 
+    FloatMatrixF< 6, 6 > compute3dTangentStiffness(GaussPoint *gp, TimeStep *tStep) const;
+    
     bool isCharacteristicMtrxSymmetric(MatResponseMode rMode) const override { return false; }
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
