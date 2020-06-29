@@ -72,6 +72,7 @@
 #define _IFT_ConcreteDPM2_deltatime "deltat"
 #define _IFT_ConcreteDPM2_helem "helem"
 #define _IFT_ConcreteDPM2_isoflag "isoflag"
+#define _IFT_ConcreteDPM2_nodamflag "nodamflag"
 //@}
 
 namespace oofem {
@@ -117,6 +118,9 @@ protected:
 
     FloatArrayF< 6 >reducedStrain;
     FloatArrayF< 6 >tempReducedStrain;
+    
+    FloatArrayF< 6 >effectiveStress;
+    FloatArrayF< 6 >tempEffectiveStress;
     //@}
 
     /// @name Hardening variable
@@ -225,6 +229,12 @@ public:
     const FloatArrayF< 6 > &giveTempReducedStrain() const { return tempReducedStrain; }
 
 
+    /**
+     * Get the effective stress vector from the material status.
+     * @return effective stress vector.
+     */
+    const FloatArrayF< 6 > &giveTempEffectiveStress() const { return tempEffectiveStress; }
+    
     /**
      * Get the plastic strain vector from the material status.
      * @return Strain vector.
@@ -462,6 +472,9 @@ public:
     void letTempReducedStrainBe(const FloatArrayF< 6 > &v)
     { tempReducedStrain = v; }
 
+    void letTempEffectiveStressBe(const FloatArrayF< 6 > &v)
+    { tempEffectiveStress = v; }
+    
 
     /**
      * Assign the temp value of the hardening variable of the plasticity model.
@@ -638,6 +651,8 @@ protected:
 
     int isotropicFlag = 0;
 
+    int noDamageFlag = 0;
+    
     double e0 = 0.;
 
     /// Parameter of the ductilityMeasure of the plasticity model.
