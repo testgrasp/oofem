@@ -626,12 +626,15 @@ ConcreteDPM2::giveRealStressVector_3d(const FloatArrayF< 6 > &fullStrainVector, 
 
     FloatArrayF< 6 >effectiveStressTension;
     FloatArrayF< 6 >effectiveStressCompression;
-    double alpha = computeAlpha(effectiveStressTension, effectiveStressCompression, effectiveStress);
-
-    auto damages = computeDamage(strainVector, D, dt, gp, tStep, alpha, effectiveStress);
-
     FloatArrayF< 6 >stress;
+
+    double alpha;
+
     if(this->noDamageFlag==0){//Apply damage
+      alpha  = computeAlpha(effectiveStressTension, effectiveStressCompression, effectiveStress);
+  
+      auto damages = computeDamage(strainVector, D, dt, gp, tStep, alpha, effectiveStress);
+    
       if ( isotropicFlag == 0 ) { //Default
         stress = effectiveStressTension * ( 1. - damages.at(1) ) + effectiveStressCompression * ( 1. - damages.at(2) );
       } else if ( isotropicFlag == 1 ) { //Consider only tensile damage. Reduction to a fully isotropic model
