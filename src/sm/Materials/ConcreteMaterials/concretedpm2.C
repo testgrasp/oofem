@@ -1200,17 +1200,14 @@ ConcreteDPM2::initDamaged(double kappaD,
                           const FloatArrayF< 6 > &strain,
                           GaussPoint *gp) const
 {
-    if ( kappaD <= 0. ) {
+  if ( kappaD <= e0 * (1. - yieldTolDamage) ) {
         return;
-    }
+  }
 
     auto status = static_cast< ConcreteDPM2Status * >( this->giveStatus(gp) );
 
     if ( helem > 0. ) {
         status->setLe(helem);
-    } else if ( strain.giveSize() == 1 ) {
-        double le = gp->giveElement()->computeLength();
-        status->setLe(le);
     } else if ( status->giveDamageTension() == 0. && status->giveDamageCompression() == 0. ) {
         //auto [principalStrains, principalDir] = computePrincipalValDir(from_voigt_strain(strain)); // c++17
         auto tmp = computePrincipalValDir( from_voigt_strain(strain) );
@@ -1235,7 +1232,7 @@ ConcreteDPM2::initDamaged(double kappaD,
         if ( le == 0. ) {
             le = gp->giveElement()->computeMeanSize();
         }
-
+	
         // store le in the corresponding status
         status->setLe(le);
     } else if ( status->giveLe() == 0. ) {
@@ -1251,8 +1248,8 @@ ConcreteDPM2::initDamaged(double kappaD,
 double
 ConcreteDPM2::computeDuctilityMeasureDamage(GaussPoint *gp, const double sig, const double rho) const
 {
-    //Angle in uniaxial compression is atan(1./sqrt(6.))=0.387597
-    double alphaZero = 0.40824829;
+  //1./sqrt(6.)=0.40824829
+  double alphaZero = 0.40824829;
 
     double Rs = 0;
     if ( sig < 0. ) {
