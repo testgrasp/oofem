@@ -952,6 +952,9 @@ public:
                                            const double tempKappa) const;
 
 
+    FloatArrayF< 6 > computeDCosThetaDStress(const FloatArrayF< 6 > &stress) const;
+    
+
     /**
      * 3D: The mixed derivative of the plastic potential with respect
      * to the invariants and the hardening parameter are determined.
@@ -1055,6 +1058,11 @@ public:
     /// Computes the derivative of rho with respect to the stress.
     FloatArrayF< 6 >computeDRhoDStress(const FloatArrayF< 6 > &stress) const;
 
+    /// Computes the derivative of function r with respect of cos theta
+    double computeDRDCosTheta(const double theta, const double ecc) const;
+
+
+   
     /// Computes the derivative of sig with respect to the stress.
     FloatArrayF< 6 >computeDSigDStress() const;
 

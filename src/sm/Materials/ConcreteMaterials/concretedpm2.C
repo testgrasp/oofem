@@ -1627,7 +1627,7 @@ ConcreteDPM2::performRegularReturn(FloatArrayF< 6 > &effectiveStress,
 
         normOfResiduals = norm(residualsNorm);
 
-	printf("normOfResiduals = %e\n", normOfResiduals);
+	//	printf("normOfResiduals = %e\n", normOfResiduals);
 	
         if ( std::isnan(normOfResiduals) ) {
             status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
@@ -1681,7 +1681,7 @@ ConcreteDPM2::performRegularReturn(FloatArrayF< 6 > &effectiveStress,
 
     //Store deltaLambda in status
     status->letDeltaLambdaBe(deltaLambda);
-    printf("sig = %e, rho = %e, theta = %e, deltaLambda = %e in return\n", sig, rho, theta, deltaLambda);
+    //    printf("sig = %e, rho = %e, theta = %e, deltaLambda = %e in return\n", sig, rho, theta, deltaLambda);
 
     return tempKappaP;
 }
@@ -1759,7 +1759,7 @@ ConcreteDPM2::computeYieldValue(double sig,
     //Compute yield equation
     return pow(Al, 2.) +
            pow(yieldHardOne, 2.) * yieldHardTwo * m * ( sig / fc + rho * rFunction / ( sqrt(6.) * fc ) ) -
-           pow(yieldHardOne, 2.) * pow(yieldHardTwo, 2.);
+           pow(yieldHardOne, 2.) * pow(yieldHardTwo, 2.); 
 }
 
 
@@ -1824,7 +1824,7 @@ ConcreteDPM2::computeDFDInv(double sig,
     //compute elliptic function r
     double rFunction = ( 4. * ( 1. - ecc * ecc ) * cos(theta) * cos(theta) + ( 2. * ecc - 1. ) * ( 2. * ecc - 1. ) ) /
                        ( 2. * ( 1. - ecc * ecc ) * cos(theta) + ( 2. * ecc - 1. ) * sqrt(4. * ( 1. - ecc * ecc ) * cos(theta) * cos(theta)
-                                                                                         + 5. * ecc * ecc - 4. * ecc) );
+                                                                                          + 5. * ecc * ecc - 4. * ecc) );
 
     //compute help functions AL, BL
     double AL = ( 1. - yieldHardOne ) * pow( ( sig / fc + rho / ( sqrt(6.) * fc ) ), 2.) + sqrt(3. / 2.) * rho / fc;
@@ -1889,8 +1889,6 @@ ConcreteDPM2::computeDDKappaDDeltaLambdaDInv(double sig,
 FloatArrayF< 6 >
 ConcreteDPM2::computeDDKappaDDeltaLambdaDStress(const FloatArrayF< 6 > &stress, double tempKappa) const
 {
-
-  FloatArrayF<6> answer;
   
   auto tmp = computeDeviatoricVolumetricSplit(stress);
   auto deviatoricStress = tmp.first;
@@ -1899,21 +1897,33 @@ ConcreteDPM2::computeDDKappaDDeltaLambdaDStress(const FloatArrayF< 6 > &stress, 
   double rho = computeSecondCoordinate(deviatoricStress);
   double theta = computeThirdCoordinate(deviatoricStress);
 
-
   auto dDKappaDDeltaLambdaDInv = computeDDKappaDDeltaLambdaDInv(sig, rho, theta, tempKappa);
+
+  // compute dDKappaDDeltaLambdaDCosTheta
+  auto dGDInv = computeDGDInv(sig, rho, tempKappa);
+
+  double equivalentDGDStress = sqrt( 1. / 3. * pow(dGDInv [ 0 ], 2.) + pow(dGDInv [ 1 ], 2.) );
+
+  double ductilityMeasure = computeDuctilityMeasure(sig, rho, theta);
+
+  //Reuse implementation to compute dKappaDDeltaLambdaDCosTheta
+  //Ductility measure has in denominator (2*cos(theta))^2
+  double dDKappaDDeltaLambdaDCosTheta = equivalentDGDStress/ductilityMeasure/cos(theta);
+  //  dDKappaDDeltaLambdaDCosTheta = 0.;
+ 
   auto dSigDStress = computeDSigDStress();
   auto dRhoDStress = computeDRhoDStress(stress);
+  auto dCosThetaDStress = computeDCosThetaDStress(stress);
 
-  answer = dSigDStress;
-  answer *= dDKappaDDeltaLambdaDInv.at(1);
+  dSigDStress *= dDKappaDDeltaLambdaDInv.at(1);
 
-  FloatArrayF<6> temp1;
-  temp1 = dRhoDStress;
-  temp1 *=dDKappaDDeltaLambdaDInv.at(2);
+  dRhoDStress *=dDKappaDDeltaLambdaDInv.at(2);
 
-  answer += temp1;
-
-  return answer;
+  dCosThetaDStress *= dDKappaDDeltaLambdaDCosTheta;
+  
+  auto dDKappaDDeltaLambdaDStress = dSigDStress+dRhoDStress+dCosThetaDStress;
+  
+  return dDKappaDDeltaLambdaDStress;
 }
 
 FloatArrayF< 6 >
@@ -2025,7 +2035,6 @@ ConcreteDPM2::computeDGDInv(double sig,
     };
 }
 
-
 FloatArrayF< 6 >
 ConcreteDPM2::computeDFDStress(const FloatArrayF< 6 > &stress,
                                double tempKappa) const
@@ -2033,15 +2042,32 @@ ConcreteDPM2::computeDFDStress(const FloatArrayF< 6 > &stress,
 
   double sig, rho, theta;
   computeCoordinates(stress,sig,rho,theta);
-    auto dFDInv = computeDFDInv(sig, rho, theta, tempKappa);
-    auto dSigDStress = computeDSigDStress();
-    auto dRhoDStress = computeDRhoDStress(stress);
+  auto dFDInv = computeDFDInv(sig, rho, theta, tempKappa);
 
-    dSigDStress *=dFDInv.at(1);
-    dRhoDStress *=dFDInv.at(2);
-    dSigDStress += dRhoDStress;
+  double dRDCosTheta = computeDRDCosTheta(theta, this->ecc);
 
-    return dSigDStress;
+  double yieldHardOne = computeHardeningOne(tempKappa);
+  double yieldHardTwo = computeHardeningTwo(tempKappa);
+
+  //Compute dFDCosTheta. This was not needed for the stress return, but now for the tangent stiffness
+  auto dFDCosTheta = dRDCosTheta * pow(yieldHardOne, 2.) * yieldHardTwo * m * rho / ( sqrt(6.) * fc ); 
+  //  dFDCosTheta = 0.;
+  
+  auto dSigDStress = computeDSigDStress();
+  auto dRhoDStress = computeDRhoDStress(stress);
+  auto dCosThetaDStress = computeDCosThetaDStress(stress);
+  
+  dSigDStress *=dFDInv.at(1);
+  dRhoDStress *=dFDInv.at(2);
+  dCosThetaDStress *= dFDCosTheta;
+
+  
+  auto dFDStress = dSigDStress + dRhoDStress + dCosThetaDStress;
+
+  //  printf("dFDStress =\n");
+  //  dFDStress.printYourself();
+  
+  return dFDStress;
 }
 
 FloatArrayF< 6 >
@@ -2131,7 +2157,7 @@ ConcreteDPM2::computeFullJacobian(const FloatArrayF< 6 > &stress,
     double sig, rho,theta;
     computeCoordinates(stress,sig,rho,theta);
 
-    printf("sig = %e, rho = %e, theta = %e, deltaLambda = %e in tangent\n", sig, rho, theta, deltaLambda);
+    //    printf("sig = %e, rho = %e, theta = %e, deltaLambda = %e in tangent\n", sig, rho, theta, deltaLambda);
     
     double dFDKappa = computeDFDKappa(sig, rho, theta, tempKappa);
     double dKappaDDeltaLambda  = computeDKappaDDeltaLambda(sig,rho,theta,tempKappa);
@@ -2485,23 +2511,24 @@ ConcreteDPM2::give3dMaterialStiffnessMatrix(MatResponseMode mode,
 {
   auto status = static_cast< ConcreteDPM2Status * >( giveStatus(gp) );
   if ( mode == ElasticStiffness ) {
-        return this->linearElasticMaterial.give3dMaterialStiffnessMatrix(mode, gp, tStep);
-    } else if ( mode == SecantStiffness ) {
-        return this->compute3dSecantStiffness(gp, tStep);
+    //    printf("return elastic stiffness\n");
+    return this->linearElasticMaterial.give3dMaterialStiffnessMatrix(mode, gp, tStep);
+  } else if ( mode == SecantStiffness ) {
+    //    printf("return secant stiffness\n");
+    return this->compute3dSecantStiffness(gp, tStep);
+  }
+  else if ( mode == TangentStiffness ) {
+    const int stateFlag = status->giveTempStateFlag();
+    const int returnType = status->giveTempReturnType();
+    if( (stateFlag == ConcreteDPM2Status::ConcreteDPM2_PlasticDamage || stateFlag == ConcreteDPM2Status::ConcreteDPM2_Plastic) && returnType == ConcreteDPM2Status::RT_Regular){       
+      //      printf("return tangent stiffness\n");
+      return this->compute3dTangentStiffness(gp, tStep);
     }
-    else if ( mode == TangentStiffness ) {
-      const int stateFlag = status->giveTempStateFlag();
-      const int returnType = status->giveTempReturnType();
-      if( (stateFlag == ConcreteDPM2Status::ConcreteDPM2_PlasticDamage || stateFlag == ConcreteDPM2Status::ConcreteDPM2_Plastic) && returnType == ConcreteDPM2Status::RT_Regular){       
-	return this->compute3dTangentStiffness(gp, tStep);
-      }
-      else{
-	return this->compute3dSecantStiffness(gp, tStep);
-      }
+    else{
+      //      printf("return secant stiffness\n");
+      return this->compute3dSecantStiffness(gp, tStep);
     }
-    else { 
-      return this->linearElasticMaterial.give3dMaterialStiffnessMatrix(mode, gp, tStep);
-    }
+  }
 }
 
 
@@ -2555,6 +2582,9 @@ ConcreteDPM2::compute3dTangentStiffness(GaussPoint *gp, TimeStep *tStep) const
   
   double tempKappa = status->giveTempKappaP();
   double deltaLambda = status->giveDeltaLambda();
+
+  //  Damage parameters
+  double omegaTension = min(status->giveTempDamageTension(), 0.999999);
   
   //Computes only the plastic part of the tangent stiffness
   auto d = this->linearElasticMaterial.give3dMaterialStiffnessMatrix(ElasticStiffness, gp, tStep);
@@ -2573,6 +2603,28 @@ ConcreteDPM2::compute3dTangentStiffness(GaussPoint *gp, TimeStep *tStep) const
   
   answer = dot(help,d); 
 
+  
+  if ( isotropicFlag == 1 ) {
+    //    return d * ( 1. - omegaTension );
+    return answer * ( 1. - omegaTension );
+  }
+
+  auto principalStress = computePrincipalValues( from_voigt_stress(effectiveStress) );
+  
+    //exclude two special cases.
+  if ( iszero(principalStress) ) {
+    return d;
+  }
+
+  for ( int i = 1; i <= 3; i++ ) {
+    if ( principalStress.at(i) < -CDPM2_TOL ) {
+      return answer;
+    }
+  }
+
+  return answer * ( 1. - omegaTension );
+  
+  
   printf("returned tangent\n");
   return answer;
 
@@ -2623,7 +2675,177 @@ ConcreteDPM2::assignStateFlag(GaussPoint *gp) const
         }
     }
 }
+  
 
+  double
+  ConcreteDPM2::computeDRDCosTheta(const double theta, const double ecc) const 
+{
+//    double thetaCrit = M_PI/3.*0.999;
+//    if (thetaCrit<theta){
+//      printf("theta = %e\n", theta);
+//      return 0;
+//    }
+  double ACostheta = 4.*(1. - ecc*ecc)*cos(theta)*cos(theta) + 
+    (2.*ecc - 1.)*(2.*ecc - 1.);
+  double BCostheta = 2.*(1. - ecc*ecc)*cos(theta) + 
+    (2.*ecc - 1.)*sqrt(4.*(1. - ecc*ecc)*cos(theta)*cos(theta) 
+                          + 5.*ecc*ecc - 4.*ecc);
+  double A1Costheta = 8.*(1. - pow(ecc,2.))*cos(theta);
+  double B1Costheta = 2.*(1. - pow(ecc,2.)) + 
+    4.*(2.*ecc - 1.)*(1. - pow(ecc,2.))*cos(theta)/
+    sqrt(4.*(1. - pow(ecc,2.))*pow(cos(theta),2.) + 
+         5.*pow(ecc,2.) - 4.*ecc);
+  double dRDCostheta = A1Costheta/BCostheta - ACostheta/pow(BCostheta,2.)*B1Costheta;
+  return dRDCostheta;
+}
+  
+//   double
+//   ConcreteDPM2::computeDDRDDCosTheta(const double theta, const double ecc) const
+// {
+//   //  double thetaCrit = M_PI/3.*0.999;
+//   // if (thetaCrit<theta){
+//   //  printf("theta = %e\n", theta);
+//   //  return 0;
+//   // }
+
+//   //compute the derivative of the  rFunction with respect to costheta
+//   double atheta = 4.*(1. - ecc*ecc)*cos(theta)*cos(theta) + 
+//     (2.*ecc - 1.)*(2.*ecc - 1.);
+//   double btheta = 2.*(1. - ecc*ecc)*cos(theta) + 
+//     (2.*ecc - 1.)*sqrt(4.*(1. - ecc*ecc)*cos(theta)*cos(theta) 
+//                           + 5.*ecc*ecc - 4.*ecc);
+//   double a1theta = 8.*(1. - ecc*ecc)*cos(theta);
+//   double b1theta = 2.*(1. - ecc*ecc) + 
+//     4.*(2.*ecc - 1.)*(1. - ecc*ecc)*cos(theta)/
+//     sqrt(4.*(1. - ecc*ecc)*cos(theta)*cos(theta) + 
+//          5.*ecc*ecc - 4.*ecc);
+  
+//   //compute the second derivative of rFunction with respect to theta
+//   double a2theta = 8.*(1. - pow(ecc,2.));
+//   double Ntheta = 4.*(1. - ecc*ecc)*cos(theta)*cos(theta) + 
+//     5.*ecc*ecc - 4.*ecc;
+//   printf("cos(theta) = %e\n", cos(theta));
+//   double b2theta =  4.*(2.*ecc - 1.)*(1. - ecc*ecc)/sqrt(Ntheta)*
+//     (1. - 4.*(1. - ecc*ecc)*cos(theta)*cos(theta)/Ntheta);
+//   double  ddrddcostheta = a2theta/btheta - 2.*a1theta*b1theta/(btheta*btheta) - 
+//     atheta*b2theta/(btheta*btheta) + 
+//     2.*atheta*b1theta*b1theta/(btheta*btheta*btheta);
+
+//   return ddrddcostheta;
+// }  
+  
+
+FloatArrayF< 6 >
+ConcreteDPM2::computeDCosThetaDStress(const FloatArrayF< 6 > &stress) const
+{
+    //compute volumetric deviatoric split
+    auto deviatoricStress = computeDeviator(stress);
+
+    //compute the coordinates
+    double rho = computeSecondCoordinate(deviatoricStress);
+
+    //compute principal stresses and directions
+    //auto [principalDeviatoricStress, principalDir] = computePrincipalValDir(from_voigt_stress(deviatoricStress)); // c++17
+    auto tmp = computePrincipalValDir(from_voigt_stress(deviatoricStress) );
+    auto principalDeviatoricStress = tmp.first;
+    auto principalDir = tmp.second;
+
+    //    printf("principal deviatoric stress:\n");
+    //    principalDeviatoricStress.printYourself();
+    
+    //compute the derivative of s1 with respect to the cartesian stress
+    FloatArrayF< 6 >ds1DStress;
+    ds1DStress [ 0 ] = principalDir.at(1, 1) * principalDir.at(1, 1) - 1. / 3.;
+    ds1DStress [ 1 ] = principalDir.at(2, 1) * principalDir.at(2, 1) - 1. / 3.;
+    ds1DStress [ 2 ] = principalDir.at(3, 1) * principalDir.at(3, 1) - 1. / 3.;
+    ds1DStress [ 3 ] = 2. * principalDir.at(2, 1) * principalDir.at(3, 1);
+    ds1DStress [ 4 ] = 2. * principalDir.at(3, 1) * principalDir(1, 1);
+    ds1DStress [ 5 ] = 2. * principalDir.at(1, 1) * principalDir.at(2, 1);
+
+    //compute dCosThetaDStress
+    auto dCosThetaDStress = ds1DStress * ( sqrt(3. / 2.) * rho / pow(rho, 2.) ) +
+                            computeDRhoDStress(stress) * ( -sqrt(3. / 2.) * principalDeviatoricStress [ 0 ] / pow(rho, 2.) );
+    return dCosThetaDStress;
+}
+
+  
+// void 
+// ConcreteDPM2::computeDDCosThetaDDStress(FloatMatrix& answer,
+//                                const StressVector& stress,
+//                                GaussPoint* gp) const
+// {
+//   MaterialMode matMode = gp->giveMaterialMode();
+//   int size = stress.giveSize();
+
+//   //compute volumetric deviatoric split
+//   StressVector deviatoricStress(matMode);
+//   double volumetricStress;
+//   stress.computeDeviatoricVolumetricSplit(deviatoricStress, volumetricStress);
+//   double rho = deviatoricStress.computeSecondCoordinate();
+  
+//   //compute principal stresses and directions
+//   FloatArray principalDeviatoricStress;
+//   FloatMatrix principalDir;
+//   deviatoricStress.computePrincipalValDir (principalDeviatoricStress, 
+//                                            principalDir);
+  
+//   //compute the derivative of s1 with respect to the cartesian stress
+//   FloatArray dS1DStress(size);
+//   dS1DStress(0) = principalDir(0,0)*principalDir(0,0)-1./3.;
+//   dS1DStress(1) = principalDir(1,0)*principalDir(1,0)-1./3.;
+//   dS1DStress(2) = principalDir(2,0)*principalDir(2,0)-1./3.;
+//   dS1DStress(3) = 2.*principalDir(1,0)*principalDir(2,0);
+//   dS1DStress(4) = 2.*principalDir(2,0)*principalDir(0,0);
+//   dS1DStress(5) = 2.*principalDir(0,0)*principalDir(1,0);
+
+//   //compute the second derivative of costheta
+//   FloatMatrix dDCosThetaDDStress(size, size);
+//   //compute the product of dS1DStress and DRhoDStress
+//   FloatArray dRhoDStress(size);
+//   computeDRhoDStress(dRhoDStress, stress, gp);
+//   FloatMatrix dS1DRho(size,size);
+//   for (int v = 0; v < size; v++ ){
+//     for(int w = 0; w < size ; w++ ){
+//       dS1DRho(v,w) = dS1DStress(v)*dRhoDStress(w);
+//     }
+//   }
+
+//   //compute the square of dRhoDStress and DRhoDStress
+//   FloatMatrix dRhoDRho(size, size);
+//   for (int v = 0; v < size; v++ ){
+//     for(int w = 0; w < size ; w++ ){
+//       dRhoDRho(v,w) = dRhoDStress(v)*dRhoDStress(w);
+//     }
+//   }
+
+//   //compute the product of dRhoDStress and DS1DStress
+//   FloatMatrix dRhoDS1(size, size);
+//   for (int v = 0; v < size; v++ ){
+//     for(int w = 0; w < size; w++ ){
+//       dRhoDS1(v,w) = dRhoDStress(v)*dS1DStress(w);
+//     }
+//   }
+  
+//   FloatMatrix dDRhoDDStress(size,size);
+//   computeDDRhoDDStress(dDRhoDDStress, stress, gp);
+//   dDCosThetaDDStress = dDRhoDDStress;
+//   dDCosThetaDDStress.times(-sqrt(3./2.)*principalDeviatoricStress(0)/pow(rho,2.));
+//   FloatMatrix helpB1;
+//   helpB1 = dS1DRho;
+//   helpB1.times(-sqrt(3./2.)/pow(rho,2.));
+//   FloatMatrix helpC1;
+//   helpC1 = dRhoDRho;
+//   helpC1.times(sqrt(6.)*principalDeviatoricStress(0)/pow(rho,3.));
+//   FloatMatrix helpD1;
+//   helpD1 = dRhoDS1;
+//   helpD1.times(-sqrt(3./2.)/pow(rho,2.));
+//   dDCosThetaDDStress.plus(helpB1);
+//   dDCosThetaDDStress.plus(helpC1);
+//   dDCosThetaDDStress.plus(helpD1);  
+//   answer = dDCosThetaDDStress;
+//   return;
+// }
+    
 FloatArrayF< 6 >
 ConcreteDPM2::computeDRhoDStress(const FloatArrayF< 6 > &stress) const
 {
