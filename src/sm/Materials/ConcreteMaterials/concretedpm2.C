@@ -604,8 +604,10 @@ ConcreteDPM2::giveRealStressVector_3d(const FloatArrayF< 6 > &fullStrainVector, 
     status->initTempStatus();
 
     //Remove thermal/shrinkage strains
-    auto thermalStrain = this->computeStressIndependentStrainVector_3d(gp, tStep, VM_Total);
-    auto strainVector = fullStrainVector - thermalStrain;
+    //    auto thermalStrain = this->computeStressIndependentStrainVector_3d(gp, tStep, VM_Total);
+    //    auto strainVector = fullStrainVector - thermalStrain;
+
+    auto strainVector = fullStrainVector;
     status->letTempReducedStrainBe(strainVector);
 
     //Calculate time increment
@@ -653,7 +655,7 @@ ConcreteDPM2::giveRealStressVector_3d(const FloatArrayF< 6 > &fullStrainVector, 
     status->letTempEffectiveStressBe(effectiveStress);
 #ifdef keep_track_of_dissipated_energy
     double gf = pow(ft, 2) / this->eM; //rough estimation only for this purpose
-    status->computeWork(gp, gf);
+    //    status->computeWork(gp, gf);
 #endif
     assignStateFlag(gp);
     return stress;
