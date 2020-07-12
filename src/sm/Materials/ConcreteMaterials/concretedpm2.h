@@ -118,7 +118,7 @@ protected:
 
     FloatArrayF< 6 >reducedStrain;
     FloatArrayF< 6 >tempReducedStrain;
-    
+
     FloatArrayF< 6 >effectiveStress;
     FloatArrayF< 6 >tempEffectiveStress;
     //@}
@@ -132,7 +132,7 @@ protected:
     double kappaPPeak = 0.;
 
     double deltaLambda = 0.;
-    
+
     double le = 0.;
 
     double alpha = 0.;
@@ -234,7 +234,7 @@ public:
      * @return effective stress vector.
      */
     const FloatArrayF< 6 > &giveTempEffectiveStress() const { return tempEffectiveStress; }
-    
+
     /**
      * Get the plastic strain vector from the material status.
      * @return Strain vector.
@@ -404,7 +404,7 @@ public:
 
     double giveDeltaLambda() const
     { return deltaLambda; }
-    
+
     /**
      * Get the temp value of the hardening variable of the damage model
      * from the material status.
@@ -474,7 +474,7 @@ public:
 
     void letTempEffectiveStressBe(const FloatArrayF< 6 > &v)
     { tempEffectiveStress = v; }
-    
+
 
     /**
      * Assign the temp value of the hardening variable of the plasticity model.
@@ -485,7 +485,7 @@ public:
 
     void letDeltaLambdaBe(double v)
     { deltaLambda = v; }
-    
+
     /**
      * Assign the temp value of the rate factor of the damage model.
      * @param v New temp value of the damage variable
@@ -619,9 +619,9 @@ public:
 };
 
 
-//   ********************************
-//   *** CLASS DYNAMIC CONCRETE   ***
-//   ********************************
+//   **************************************************
+//   *** CLASS CONCRETE DAMAGE PLASTICITY MODEL 2   ***
+//   **************************************************
 
 /**
  * This class contains the combination of a local plasticity model for concrete with a local isotropic damage model.
@@ -652,7 +652,7 @@ protected:
     int isotropicFlag = 0;
 
     int noDamageFlag = 0;
-    
+
     double e0 = 0.;
 
     /// Parameter of the ductilityMeasure of the plasticity model.
@@ -948,12 +948,26 @@ public:
                                         double rho,
                                         double tempKappa) const;
 
+
+    /**
+     * 3D: Second derivative of the plastic potential with respect to the
+     * stress.
+     */
     FloatMatrixF< 6, 6 >computeDDGDDStress(const FloatArrayF< 6 > &stress,
                                            const double tempKappa) const;
 
 
-    FloatArrayF< 6 > computeDCosThetaDStress(const FloatArrayF< 6 > &stress) const;
-    
+    /**
+     * 3D: Derivative of cos theta with respect to the
+     * stress.
+     */
+    FloatArrayF< 6 >computeDCosThetaDStress(const FloatArrayF< 6 > &stress) const;
+
+    /**
+     * 3D: Second derivative of cos theta with respect to the
+     * stress.
+     */
+    FloatMatrixF< 6, 6 >computeDDCosThetaDDStress(const FloatArrayF< 6 > &stress) const;
 
     /**
      * 3D: The mixed derivative of the plastic potential with respect
@@ -974,10 +988,10 @@ public:
                                                    double theta,
                                                    double tempKappa) const;
 
-    FloatArrayF<6> computeDDKappaDDeltaLambdaDStress(const FloatArrayF< 6 > &stress, double tempKappa) const;
+    FloatArrayF< 6 >computeDDKappaDDeltaLambdaDStress(const FloatArrayF< 6 > &stress, double tempKappa) const;
 
-    FloatArrayF< 6 > computeDDGDStressDKappa(const FloatArrayF< 6 > &stress, double tempKappa) const;
-    
+    FloatArrayF< 6 >computeDDGDStressDKappa(const FloatArrayF< 6 > &stress, double tempKappa) const;
+
     /**
      * Computes the derivative of the evolution law of the hardening parameter kappa with respect to the hardening variable kappa.
      */
@@ -993,12 +1007,23 @@ public:
                                   double theta,
                                   double tempKappa) const;
 
+    /**
+     * Computes the derivative of the yield surface with respect to the
+     * stress.
+     */
     FloatArrayF< 6 >computeDFDStress(const FloatArrayF< 6 > &stress,
                                      const double tempKappa) const;
 
+    /**
+     * Computes the derivative of the plastic potential with respect to the
+     * stress.
+     */
     FloatArrayF< 6 >computeDGDStress(const FloatArrayF< 6 > &stress,
                                      const double tempKappa) const;
 
+    /**
+     * Computes full Jacobian for tangent
+     */
     FloatMatrixF< 8, 8 >computeFullJacobian(const FloatArrayF< 6 > &stress,
                                             const double deltaLambda,
                                             GaussPoint *gp,
@@ -1020,6 +1045,7 @@ public:
                                const FloatMatrixF< 6, 6 > &D,
                                GaussPoint *gp) const;
 
+    /// Compute alpha for rate effect
     double computeAlpha(FloatArrayF< 6 > &effectiveStressTension, FloatArrayF< 6 > &effectiveStressCompression, const FloatArrayF< 6 > &effectiveStress) const;
 
     /// Compute damage parameter in tension.
@@ -1058,28 +1084,27 @@ public:
     /// Computes the derivative of rho with respect to the stress.
     FloatArrayF< 6 >computeDRhoDStress(const FloatArrayF< 6 > &stress) const;
 
-    /// Computes the derivative of function r with respect of cos theta
+    /// Computes the derivative of function r with respect to cos theta
     double computeDRDCosTheta(const double theta, const double ecc) const;
 
+    /// Computes the second derivative of function r with respect to cos theta
+    double computeDDRDDCosTheta(const double theta, const double ecc) const;
 
-   
+
     /// Computes the derivative of sig with respect to the stress.
     FloatArrayF< 6 >computeDSigDStress() const;
 
     /// Computes the second derivative of rho with the respect to the stress.
     FloatMatrixF< 6, 6 >computeDDRhoDDStress(const FloatArrayF< 6 > &stress) const;
 
-    /// Computes the second derivative of rho with the respect to the stress the old way.
-    FloatMatrixF< 6, 6 >computeDDRhoDDStressOld(const FloatArrayF< 6 > &stress) const;
-
-    
     FloatMatrixF< 6, 6 >give3dMaterialStiffnessMatrix(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const override;
 
     /// Compute the 3d secant stiffness matrix.
     FloatMatrixF< 6, 6 >compute3dSecantStiffness(GaussPoint *gp, TimeStep *tStep) const;
 
-    FloatMatrixF< 6, 6 > compute3dTangentStiffness(GaussPoint *gp, TimeStep *tStep) const;
-    
+    /// Compute the 3d tangent stiffness matrix.
+    FloatMatrixF< 6, 6 >compute3dTangentStiffness(GaussPoint *gp, TimeStep *tStep) const;
+
     bool isCharacteristicMtrxSymmetric(MatResponseMode rMode) const override { return false; }
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
