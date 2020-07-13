@@ -1356,7 +1356,8 @@ ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 >
             }
 
             subIncrementFlag = 1;
-            tempStrain = convergedStrain + 0.5 * deltaStrain;
+	    deltaStrain *= 0.5;
+            tempStrain = convergedStrain + deltaStrain;	    
         } else if ( status->giveTempReturnResult() == ConcreteDPM2Status::RR_Converged && subIncrementFlag == 0 ) {
             auto C = inv(D); // compliance
             elasticStrain = dot(C, effectiveStress);
@@ -2533,7 +2534,6 @@ ConcreteDPM2::compute3dTangentStiffness(GaussPoint *gp, TimeStep *tStep) const
 
 
     if ( isotropicFlag == 1 ) {
-        //    return d * ( 1. - omegaTension );
         return answer * ( 1. - omegaTension );
     }
 
