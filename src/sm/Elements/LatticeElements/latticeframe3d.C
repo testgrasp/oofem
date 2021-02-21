@@ -292,6 +292,8 @@ LatticeFrame3d::giveInternalForcesVector(FloatArray &answer,
     FloatMatrix b, bt;
     FloatArray u, stress, strain;
 
+    this->length = computeLength();
+    
     this->computeVectorOf(VM_Total, tStep, u);
 
     if ( initialDisplacements ) {
@@ -312,16 +314,18 @@ LatticeFrame3d::giveInternalForcesVector(FloatArray &answer,
             strain.zero();
         }
         strain.beProductOf(b, u);
+	//Peter: The 1/length is outside the B-matrix, because we use B^T for computing the forces at the nodes.
+	strain.times(1./this->length);
         this->computeStressVector(stress, strain, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
     }
 
     answer.beProductOf(bt, stress);
 
-    printf("strains\n");
-    strain.printYourself();
+    // printf("strains\n");
+    // strain.printYourself();
 
-    printf("internal forces\n");
-    answer.printYourself();
+    // printf("internal forces\n");
+    // answer.printYourself();
 
     // if inactive update state, but no contribution to global system
     if ( !this->isActivated(tStep) ) {

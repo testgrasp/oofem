@@ -122,16 +122,16 @@ LatticeFrameElastic::giveFrameForces3d(const FloatArrayF< 6 > &strain,
                                        GaussPoint *gp,
                                        TimeStep *tStep)
 {
-    //Peter: This needs to be extended. I tried to implement first the elastic case. However, this need to be included to plasticity or other inelastic models.
+    //Peter: This needs to be extended. I tried to implement first the elastic case. 
     auto status = static_cast< LatticeMaterialStatus * >( this->giveStatus(gp) );
 
     this->initTempStatus(gp);
     auto stiffnessMatrix = LatticeFrameElastic::give3dFrameStiffnessMatrix(ElasticStiffness, gp, tStep);
     auto stress = dot(stiffnessMatrix, strain);
-    printf("strain:\n");
-    strain.printYourself();
-    printf("stress:\n");
-    stress.printYourself();
+    // printf("strain:\n");
+    // strain.printYourself();
+    // printf("stress:\n");
+    // stress.printYourself();
     status->letTempLatticeStrainBe(strain);
     status->letTempLatticeStressBe(stress);
 
@@ -152,7 +152,7 @@ LatticeFrameElastic::give3dFrameStiffnessMatrix(MatResponseMode rmode, GaussPoin
     /*Peter: Gumaa, you need to enter here the part of the stiffness matrix which depend on the material parameters only. Later, you can then add the sectional parameters on the cross-section level*/
     static_cast< LatticeMaterialStatus * >( this->giveStatus(gp) );
 
-    //Peter: Write here what shear modulus G is.
+    //Peter: Write here what shear modulus G is. It should be a function of E and nu.
     double g = this->e;
 
     //Peter: All the structural properties are read from the element
@@ -163,6 +163,7 @@ LatticeFrameElastic::give3dFrameStiffnessMatrix(MatResponseMode rmode, GaussPoin
     const double shearareay = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveShearAreaY();
     const double shearareaz = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveShearAreaZ();
 
+    //Peter: You need to put here the correct values. Please check this. 
     FloatArrayF< 6 >d = {
         this->e * area,
         g *shearareay,
@@ -171,8 +172,7 @@ LatticeFrameElastic::give3dFrameStiffnessMatrix(MatResponseMode rmode, GaussPoin
         this->e * iz,
         g *ik
     };
-    d.printYourself();
-
+ 
     return diag(d);
 }
 }
