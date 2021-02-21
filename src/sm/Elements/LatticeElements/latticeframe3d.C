@@ -59,23 +59,25 @@
 namespace oofem {
 REGISTER_Element(LatticeFrame3d);
 
-LatticeFrame3d :: LatticeFrame3d(int n, Domain *aDomain) : LatticeStructuralElement(n, aDomain)
+LatticeFrame3d::LatticeFrame3d(int n, Domain *aDomain) : LatticeStructuralElement(n, aDomain)
 {
     numberOfDofMans = 2;
 }
 
-LatticeFrame3d :: ~LatticeFrame3d()
+LatticeFrame3d::~LatticeFrame3d()
 {}
 
 
 void
-LatticeFrame3d :: computeBmatrixAt(GaussPoint *aGaussPoint, FloatMatrix &answer, int li, int ui)
+LatticeFrame3d::computeBmatrixAt(GaussPoint *aGaussPoint, FloatMatrix &answer, int li, int ui)
 // Returns the strain matrix of the receiver.
 {
-
     //Assemble Bmatrix (used to compute strains and rotations}
     answer.resize(6, 12);
     answer.zero();
+
+    //Peter: Wherever we use the length, we need to make sure that we have computed it.
+    this->length = computeLength();
 
     //Normal displacement jump in x-direction
     //First node
@@ -173,11 +175,13 @@ LatticeFrame3d :: computeBmatrixAt(GaussPoint *aGaussPoint, FloatMatrix &answer,
     answer.at(6, 11) = 0.;
     answer.at(6, 12) = 1.;
 
+    //Peter: Should the B-matrix be divided by the length? You need strain for calculating the Integration point forces. However, later you also use the transpose to calculate nodal forces. Do you need the length in both or only for calculating strain?
+
     return;
 }
 
 void
-LatticeFrame3d :: giveGPCoordinates(FloatArray &coords)
+LatticeFrame3d::giveGPCoordinates(FloatArray &coords)
 {
     coords.resize(3);
     coords = this->globalCentroid;
@@ -185,29 +189,27 @@ LatticeFrame3d :: giveGPCoordinates(FloatArray &coords)
 }
 
 double
-LatticeFrame3d :: giveLength()
+LatticeFrame3d::giveLength()
 {
-
     return this->length;
 }
 
 
 
 void
-LatticeFrame3d :: computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
+LatticeFrame3d::computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
 {
     answer =  static_cast< LatticeCrossSection * >( this->giveCrossSection() )->give3dFrameStiffnessMatrix(rMode, gp, tStep);
-
 }
 
 void
-LatticeFrame3d :: computeStressVector(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
+LatticeFrame3d::computeStressVector(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
 {
-  answer = static_cast< LatticeCrossSection * >( this->giveCrossSection() )->giveFrameForces3d(strain, gp, tStep);
+    answer = static_cast< LatticeCrossSection * >( this->giveCrossSection() )->giveFrameForces3d(strain, gp, tStep);
 }
 
 int
-LatticeFrame3d :: computeGlobalCoordinates(FloatArray &answer, const FloatArray &lcoords)
+LatticeFrame3d::computeGlobalCoordinates(FloatArray &answer, const FloatArray &lcoords)
 {
     double ksi, n1, n2;
 
@@ -216,20 +218,22 @@ LatticeFrame3d :: computeGlobalCoordinates(FloatArray &answer, const FloatArray 
     n2  = ( 1. + ksi ) * 0.5;
 
     answer.resize(3);
-    answer.at(1) = n1 * this->giveNode(1)->giveCoordinate(1) + n2 *this->giveNode(2)->giveCoordinate(1);
-    answer.at(2) = n1 * this->giveNode(1)->giveCoordinate(2) + n2 *this->giveNode(2)->giveCoordinate(2);
-    answer.at(3) = n1 * this->giveNode(1)->giveCoordinate(3) + n2 *this->giveNode(2)->giveCoordinate(3);
+    answer.at(1) = n1 * this->giveNode(1)->giveCoordinate(1) + n2 * this->giveNode(2)->giveCoordinate(1);
+    answer.at(2) = n1 * this->giveNode(1)->giveCoordinate(2) + n2 * this->giveNode(2)->giveCoordinate(2);
+    answer.at(3) = n1 * this->giveNode(1)->giveCoordinate(3) + n2 * this->giveNode(2)->giveCoordinate(3);
 
     return 1;
 }
 
-  
+
 void
-LatticeFrame3d :: computeStiffnessMatrix(FloatMatrix &answer, MatResponseMode rMode,
-                                    TimeStep *tStep)
+LatticeFrame3d::computeStiffnessMatrix(FloatMatrix &answer, MatResponseMode rMode,
+                                       TimeStep *tStep)
 // Computes numerically the stiffness matrix of the receiver.
 {
     FloatMatrix d, bi, bj, bjt, dbj, dij;
+
+    this->length = computeLength();
 
     answer.resize(12, 12);
     answer.zero();
@@ -237,52 +241,55 @@ LatticeFrame3d :: computeStiffnessMatrix(FloatMatrix &answer, MatResponseMode rM
     this->computeConstitutiveMatrixAt(d, rMode, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
 
     dbj.beProductOf(d, bj);
+    //Peter: I divide this now by the length? However, it might need to go into the Bmatrix. Please check your derivation.
+    dbj.times(1. / length);
     bjt.beTranspositionOf(bj);
+    //Peter: No length here? Please check.
     answer.beProductOf(bjt, dbj);
 
     return;
 }
 
-void LatticeFrame3d :: computeGaussPoints()
+void LatticeFrame3d::computeGaussPoints()
 // Sets up the array of Gauss Points of the receiver.
 {
     integrationRulesArray.resize(1);
-    integrationRulesArray [ 0 ].reset(new GaussIntegrationRule(1, this, 1, 3) );
+    integrationRulesArray [ 0 ].reset( new GaussIntegrationRule(1, this, 1, 3) );
     integrationRulesArray [ 0 ]->SetUpPointsOnLine(1, _3dLattice);
 }
 
 
 
-double LatticeFrame3d :: giveArea() {
+double LatticeFrame3d::giveArea() {
     return this->area;
 }
 
-double LatticeFrame3d :: giveIy() {
+double LatticeFrame3d::giveIy() {
     return this->iy;
 }
 
-double LatticeFrame3d :: giveIz() {
+double LatticeFrame3d::giveIz() {
     return this->iz;
 }
 
-double LatticeFrame3d :: giveIk() {
+double LatticeFrame3d::giveIk() {
     return this->ik;
 }
 
-double LatticeFrame3d :: giveShearAreaY() {
+double LatticeFrame3d::giveShearAreaY() {
     return this->shearareay;
 }
 
-double LatticeFrame3d :: giveShearAreaZ() {
+double LatticeFrame3d::giveShearAreaZ() {
     return this->shearareaz;
 }
 
 
-  void
-LatticeFrame3d :: giveInternalForcesVector(FloatArray &answer,
-                                              TimeStep *tStep, int useUpdatedGpRecord)
+void
+LatticeFrame3d::giveInternalForcesVector(FloatArray &answer,
+                                         TimeStep *tStep, int useUpdatedGpRecord)
 {
-  FloatMatrix b,bt;
+    FloatMatrix b, bt;
     FloatArray u, stress, strain;
 
     this->computeVectorOf(VM_Total, tStep, u);
@@ -293,28 +300,28 @@ LatticeFrame3d :: giveInternalForcesVector(FloatArray &answer,
 
     // zero answer will resize accordingly when adding first contribution
     answer.clear();
-    
+
     this->computeBmatrixAt(integrationRulesArray [ 0 ]->getIntegrationPoint(0), b);
     bt.beTranspositionOf(b);
-    
+
     if ( useUpdatedGpRecord == 1 ) {
-      LatticeMaterialStatus *lmatStat = dynamic_cast< LatticeMaterialStatus * >( integrationRulesArray [ 0 ]->getIntegrationPoint(0)->giveMaterialStatus() );
-      stress = lmatStat->giveLatticeStress();       
+        LatticeMaterialStatus *lmatStat = dynamic_cast< LatticeMaterialStatus * >( integrationRulesArray [ 0 ]->getIntegrationPoint(0)->giveMaterialStatus() );
+        stress = lmatStat->giveLatticeStress();
     } else {
-      if ( !this->isActivated(tStep) ) {
-	strain.zero();
-	  }	  
-	  strain.beProductOf(b, u);
-	  this->computeStressVector(stress, strain, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
+        if ( !this->isActivated(tStep) ) {
+            strain.zero();
         }
-	
-	answer.beProductOf(bt, stress);
-	
-	printf("strains\n");
-	strain.printYourself();
-	
-	printf("internal forces\n");
-	answer.printYourself();
+        strain.beProductOf(b, u);
+        this->computeStressVector(stress, strain, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
+    }
+
+    answer.beProductOf(bt, stress);
+
+    printf("strains\n");
+    strain.printYourself();
+
+    printf("internal forces\n");
+    answer.printYourself();
 
     // if inactive update state, but no contribution to global system
     if ( !this->isActivated(tStep) ) {
@@ -323,10 +330,10 @@ LatticeFrame3d :: giveInternalForcesVector(FloatArray &answer,
     }
 }
 
-  
-  
+
+
 bool
-LatticeFrame3d :: computeGtoLRotationMatrix(FloatMatrix &answer)
+LatticeFrame3d::computeGtoLRotationMatrix(FloatMatrix &answer)
 {
     FloatMatrix lcs;
     answer.resize(12, 12);
@@ -347,20 +354,19 @@ LatticeFrame3d :: computeGtoLRotationMatrix(FloatMatrix &answer)
 
 
 int
-LatticeFrame3d :: giveLocalCoordinateSystem(FloatMatrix &answer)
+LatticeFrame3d::giveLocalCoordinateSystem(FloatMatrix &answer)
 {
-
-  FloatArray lx, ly, lz, help(3);
-  Node *nodeA, *nodeB;
-  nodeA = this->giveNode(1);
+    FloatArray lx, ly, lz, help(3);
+    Node *nodeA, *nodeB;
+    nodeA = this->giveNode(1);
     nodeB = this->giveNode(2);
 
-    lx.beDifferenceOf( nodeB->giveCoordinates(), nodeA->giveCoordinates() );
+    lx.beDifferenceOf(nodeB->giveCoordinates(), nodeA->giveCoordinates() );
     lx.normalize();
 
     if ( this->referenceNode ) {
         Node *refNode = this->giveDomain()->giveNode(this->referenceNode);
-        help.beDifferenceOf( refNode->giveCoordinates(), nodeA->giveCoordinates() );
+        help.beDifferenceOf(refNode->giveCoordinates(), nodeA->giveCoordinates() );
 
         lz.beVectorProductOf(lx, help);
         lz.normalize();
@@ -386,7 +392,7 @@ LatticeFrame3d :: giveLocalCoordinateSystem(FloatMatrix &answer)
 
         help.at(3) = 1.0;         // up-vector
         // here is ly is used as a temp var
-        if ( fabs( lx.dotProduct(help) ) > 0.999 ) { // Check if it is vertical
+        if ( fabs(lx.dotProduct(help) ) > 0.999 ) {  // Check if it is vertical
             ly = {
                 0., 1., 0.
             };
@@ -412,15 +418,8 @@ LatticeFrame3d :: giveLocalCoordinateSystem(FloatMatrix &answer)
 }
 
 
-double
-LatticeFrame3d :: computeVolumeAround(GaussPoint *aGaussPoint)
-{
-
-    return this->area * this->length;
-}
-
 void
-LatticeFrame3d :: giveDofManDofIDMask(int inode, IntArray &answer) const
+LatticeFrame3d::giveDofManDofIDMask(int inode, IntArray &answer) const
 {
     answer = {
         D_u, D_v, D_w, R_u, R_v, R_w
@@ -428,9 +427,9 @@ LatticeFrame3d :: giveDofManDofIDMask(int inode, IntArray &answer) const
 }
 
 void
-LatticeFrame3d :: initializeFrom(InputRecord &ir)
+LatticeFrame3d::initializeFrom(InputRecord &ir)
 {
-    LatticeStructuralElement :: initializeFrom(ir);
+    LatticeStructuralElement::initializeFrom(ir);
 
     referenceNode = 0;
     referenceAngle = 0;
@@ -456,7 +455,7 @@ LatticeFrame3d :: initializeFrom(InputRecord &ir)
 
     this->iz = 0.0;
     IR_GIVE_OPTIONAL_FIELD(ir, this->iz, _IFT_LatticeCrossSection_iz);
-    
+
     this->ik = 0.0;
     IR_GIVE_OPTIONAL_FIELD(ir, this->ik, _IFT_LatticeCrossSection_ik);
 
@@ -473,13 +472,32 @@ LatticeFrame3d :: initializeFrom(InputRecord &ir)
     IR_GIVE_OPTIONAL_FIELD(ir, this->shearareaz, _IFT_LatticeCrossSection_shearareaz);
     if ( this->shearareaz == 0.0 ) {
         this->shearareaz = beamshearcoeff * area;
-    }    
-    
+    }
 }
 
 
+double
+LatticeFrame3d::computeLength()
+{
+    double dx, dy, dz;
+    Node *nodeA, *nodeB;
+
+    if ( length == 0. ) {
+        nodeA   = this->giveNode(1);
+        nodeB   = this->giveNode(2);
+        dx      = nodeB->giveCoordinate(1) - nodeA->giveCoordinate(1);
+        dy      = nodeB->giveCoordinate(2) - nodeA->giveCoordinate(2);
+        dz      = nodeB->giveCoordinate(3) - nodeA->giveCoordinate(3);
+        length  = sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    return length;
+}
+
+
+
 void
-LatticeFrame3d :: computeLumpedMassMatrix(FloatMatrix &answer, TimeStep *tStep)
+LatticeFrame3d::computeLumpedMassMatrix(FloatMatrix &answer, TimeStep *tStep)
 // Returns the lumped mass matrix of the receiver. This expression is
 // valid in both local and global axes.
 {
@@ -491,9 +509,4 @@ LatticeFrame3d :: computeLumpedMassMatrix(FloatMatrix &answer, TimeStep *tStep)
     answer.at(1, 1) = answer.at(2, 2) = answer.at(3, 3) = halfMass;
     answer.at(7, 7) = answer.at(8, 8) = answer.at(9, 9) = halfMass;
 }
-
-
-  
-
-
 } // end namespace oofem

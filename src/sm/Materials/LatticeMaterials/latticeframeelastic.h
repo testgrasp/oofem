@@ -64,11 +64,11 @@ protected:
     double nu;
 
 public:
- LatticeFrameElastic(int n, Domain *d) : LatticeStructuralMaterial(n, d) { };
+    LatticeFrameElastic(int n, Domain *d) : LatticeStructuralMaterial(n, d) { };
 
 
     FloatArrayF< 6 >giveThermalDilatationVector(GaussPoint *gp,  TimeStep *tStep) const override;
-    
+
     const char *giveInputRecordName() const override { return _IFT_LatticeFrameElastic_Name; }
 
     const char *giveClassName() const override { return "LatticeFrameElastic"; }

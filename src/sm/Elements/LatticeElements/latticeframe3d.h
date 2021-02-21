@@ -54,13 +54,14 @@ namespace oofem {
 class LatticeFrame3d : public LatticeStructuralElement
 {
 protected:
-  int referenceNode;
-  FloatArray zaxis;
-  double referenceAngle = 0;
-  double kappa, length;
-  double iy, iz, ik;
-  double area, shearareay, shearareaz;
-  
+    int referenceNode;
+    FloatArray zaxis;
+    double referenceAngle = 0;
+    double kappa;
+    double length = 0.;
+    double iy, iz, ik;
+    double area, shearareay, shearareaz;
+
     FloatMatrix localCoordinateSystem;
 
     FloatArray midPoint, globalCentroid, normal;
@@ -74,6 +75,10 @@ public:
 
     int computeGlobalCoordinates(FloatArray &answer, const FloatArray &lcoords) override;
 
+    double computeLength() override
+
+    ;
+
     double giveLength() override;
 
     double giveArea() override;
@@ -81,18 +86,17 @@ public:
     double giveIy() override;
 
     double giveIz() override;
-    
+
     double giveIk() override;
-      
+
     double giveShearAreaY() override;
 
     double giveShearAreaZ() override;
-    
+
     int computeNumberOfDofs() override { return 12; }
 
     void giveDofManDofIDMask(int inode, IntArray &) const override;
 
-    double computeVolumeAround(GaussPoint *) override;
 
     virtual void giveGPCoordinates(FloatArray &coords);
 
@@ -111,11 +115,11 @@ protected:
     bool computeGtoLRotationMatrix(FloatMatrix &) override;
     void computeLumpedMassMatrix(FloatMatrix &answer, TimeStep *tStep) override;
     void computeMassMatrix(FloatMatrix &answer, TimeStep *tStep) override
-    { this->computeLumpedMassMatrix(answer, tStep); }    
+    { this->computeLumpedMassMatrix(answer, tStep); }
     void computeStiffnessMatrix(FloatMatrix &answer, MatResponseMode rMode, TimeStep *tStep) override;
     void computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) override;
     void computeStressVector(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep) override;
-        void computeGaussPoints() override;
+    void computeGaussPoints() override;
     integrationDomain giveIntegrationDomain() const override { return _Line; }
 };
 } // end namespace oofem

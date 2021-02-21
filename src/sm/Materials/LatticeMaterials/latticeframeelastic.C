@@ -59,33 +59,32 @@ REGISTER_Material(LatticeFrameElastic);
 
 
 bool
-LatticeFrameElastic :: hasMaterialModeCapability(MaterialMode mode) const
+LatticeFrameElastic::hasMaterialModeCapability(MaterialMode mode) const
 {
     return ( mode == _3dLattice );
 }
 
 
 void
-LatticeFrameElastic :: initializeFrom(InputRecord &ir)
+LatticeFrameElastic::initializeFrom(InputRecord &ir)
 {
-    LatticeStructuralMaterial :: initializeFrom(ir);
+    LatticeStructuralMaterial::initializeFrom(ir);
 
     //Young's modulus of the material that the beam element is made of
     IR_GIVE_FIELD(ir, this->e, _IFT_LatticeFrameElastic_e); // Macro
 
     //Poisson's ratio of the material that the beam element is made of
     IR_GIVE_FIELD(ir, this->nu, _IFT_LatticeFrameElastic_n); // Macro
-    
 }
 
 MaterialStatus *
-LatticeFrameElastic :: CreateStatus(GaussPoint *gp) const
+LatticeFrameElastic::CreateStatus(GaussPoint *gp) const
 {
     return new LatticeMaterialStatus(gp);
 }
 
 MaterialStatus *
-LatticeFrameElastic :: giveStatus(GaussPoint *gp) const
+LatticeFrameElastic::giveStatus(GaussPoint *gp) const
 {
     MaterialStatus *status = static_cast< MaterialStatus * >( gp->giveMaterialStatus() );
     if ( !status ) {
@@ -102,34 +101,35 @@ LatticeFrameElastic :: giveStatus(GaussPoint *gp) const
 
 
 FloatArrayF< 6 >
-LatticeFrameElastic :: giveThermalDilatationVector(GaussPoint *gp,  TimeStep *tStep) const
+LatticeFrameElastic::giveThermalDilatationVector(GaussPoint *gp,  TimeStep *tStep) const
 //
 // returns a FloatArray(6) of initial strain vector
 // caused by unit temperature in direction of
 // gp (element) local axes
 //
 {
-  double alpha = this->give(tAlpha, gp);
+    double alpha = this->give(tAlpha, gp);
 
 
     return {
-               alpha, 0., 0., 0., 0., 0.
+        alpha, 0., 0., 0., 0., 0.
     };
 }
 
-  
-FloatArrayF< 6 >
-LatticeFrameElastic :: giveFrameForces3d(const FloatArrayF< 6 > &strain,
-                                            GaussPoint *gp,
-                                            TimeStep *tStep)
-{
 
-  //Peter: This needs to be extended. I tried to implement first the elastic case. However, this need to be included to plasticity or other inelastic models.
+FloatArrayF< 6 >
+LatticeFrameElastic::giveFrameForces3d(const FloatArrayF< 6 > &strain,
+                                       GaussPoint *gp,
+                                       TimeStep *tStep)
+{
+    //Peter: This needs to be extended. I tried to implement first the elastic case. However, this need to be included to plasticity or other inelastic models.
     auto status = static_cast< LatticeMaterialStatus * >( this->giveStatus(gp) );
 
     this->initTempStatus(gp);
-    auto stiffnessMatrix = LatticeFrameElastic :: give3dFrameStiffnessMatrix(ElasticStiffness, gp, tStep);
+    auto stiffnessMatrix = LatticeFrameElastic::give3dFrameStiffnessMatrix(ElasticStiffness, gp, tStep);
     auto stress = dot(stiffnessMatrix, strain);
+    printf("strain:\n");
+    strain.printYourself();
     printf("stress:\n");
     stress.printYourself();
     status->letTempLatticeStrainBe(strain);
@@ -140,41 +140,39 @@ LatticeFrameElastic :: giveFrameForces3d(const FloatArrayF< 6 > &strain,
 
 
 Interface *
-LatticeFrameElastic :: giveInterface(InterfaceType type)
+LatticeFrameElastic::giveInterface(InterfaceType type)
 {
     return nullptr;
 }
 
 
 FloatMatrixF< 6, 6 >
-LatticeFrameElastic :: give3dFrameStiffnessMatrix(MatResponseMode rmode, GaussPoint *gp, TimeStep *atTime) const
-{  
-  /*Peter: Gumaa, you need to enter here the part of the stiffness matrix which depend on the material parameters only. Later, you can then add the sectional parameters on the cross-section level*/
-  static_cast< LatticeMaterialStatus * >( this->giveStatus(gp) );
+LatticeFrameElastic::give3dFrameStiffnessMatrix(MatResponseMode rmode, GaussPoint *gp, TimeStep *atTime) const
+{
+    /*Peter: Gumaa, you need to enter here the part of the stiffness matrix which depend on the material parameters only. Later, you can then add the sectional parameters on the cross-section level*/
+    static_cast< LatticeMaterialStatus * >( this->giveStatus(gp) );
 
-  //Peter: Write here what shear modulus G is.
-  double g = this->e*this->nu;
+    //Peter: Write here what shear modulus G is.
+    double g = this->e;
 
-  //Peter: All the structural properties are read from the element
-  const double area = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveArea();
-  const double iy = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveIy();
-  const double iz = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveIz();
-  const double ik = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveIk();
-  const double shearareay = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveShearAreaY();
-  const double shearareaz = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveShearAreaZ();
-  
-  FloatArrayF< 6 >d = {
-    this->e*area,
-    g*shearareay,
-    g*shearareaz,
-    this->e*iy,
-    this->e*iz,
-    g*ik
-  };
-  d.printYourself();
-  
-  return diag(d);
+    //Peter: All the structural properties are read from the element
+    const double area = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveArea();
+    const double iy = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveIy();
+    const double iz = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveIz();
+    const double ik = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveIk();
+    const double shearareay = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveShearAreaY();
+    const double shearareaz = ( static_cast< LatticeStructuralElement * >( gp->giveElement() ) )->giveShearAreaZ();
+
+    FloatArrayF< 6 >d = {
+        this->e * area,
+        g *shearareay,
+        g *shearareaz,
+        this->e * iy,
+        this->e * iz,
+        g *ik
+    };
+    d.printYourself();
+
+    return diag(d);
 }
-
-
 }

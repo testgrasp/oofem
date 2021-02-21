@@ -67,18 +67,18 @@ typedef GaussPoint IntegrationPoint;
  */
 class LatticeCrossSection : public CrossSection
 {
- protected:
-  int materialNumber = 0; ///< Material number
-  double area = 0.;
-  double iy = 0.;
-  double iz = 0.;
-  double ik = 0.;
-  double beamshearcoeff =0.;
-  double shearareay = 0.;
-  double shearareaz = 0.;
-  
-  
- public:
+protected:
+    int materialNumber = 0; ///< Material number
+    double area = 0.;
+    double iy = 0.;
+    double iz = 0.;
+    double ik = 0.;
+    double beamshearcoeff = 0.;
+    double shearareay = 0.;
+    double shearareaz = 0.;
+
+
+public:
     /**
      * Constructor. Creates cross section with given number, belonging to given domain.
      * @param n Cross section number.
@@ -93,7 +93,7 @@ class LatticeCrossSection : public CrossSection
     virtual ~LatticeCrossSection() { }
 
     void initializeFrom(InputRecord &ir) override;
-    
+
     int testCrossSectionExtension(CrossSectExtension ext) override { return this->crossSectionType; }
 
     /**
@@ -112,7 +112,7 @@ class LatticeCrossSection : public CrossSection
      */
     //@{
     // Pass all calls to the material
-    
+
     double giveLatticeStress1d(double strain, GaussPoint *gp, TimeStep *tStep) const;
 
     FloatArrayF< 3 >giveLatticeStress2d(const FloatArrayF< 3 > &strain, GaussPoint *gp, TimeStep *tStep) const;
@@ -149,7 +149,7 @@ class LatticeCrossSection : public CrossSection
     const char *giveInputRecordName() const override { return _IFT_LatticeCrossSection_Name; }
 
     virtual double give(int aProperty, GaussPoint *gp) const override;
-    
+
     //    void giveCharMaterialStiffnessMatrix(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep);
 
 
