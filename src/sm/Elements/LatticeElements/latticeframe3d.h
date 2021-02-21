@@ -40,6 +40,10 @@
 ///@name Input fields for LatticeFrame3d
 //@{
 #define _IFT_LatticeFrame3d_Name "latticeframe3d"
+#define _IFT_LatticeFrame3d_refnode "refnode"
+#define _IFT_LatticeFrame3d_refangle "refangle"
+#define _IFT_LatticeFrame3d_zaxis "zaxis"
+
 //@}
 
 namespace oofem {
@@ -50,10 +54,15 @@ namespace oofem {
 class LatticeFrame3d : public LatticeStructuralElement
 {
 protected:
-    double kappa, length;
-    double I1, I2, Ip;
+  int referenceNode;
+  FloatArray zaxis;
+  double referenceAngle = 0;
+  double kappa, length;
+  double iy, iz, ik;
+  double area, shearareay, shearareaz;
+  
     FloatMatrix localCoordinateSystem;
-    double area;
+
     FloatArray midPoint, globalCentroid, normal;
 
 public:
@@ -69,6 +78,16 @@ public:
 
     double giveArea() override;
 
+    double giveIy() override;
+
+    double giveIz() override;
+    
+    double giveIk() override;
+      
+    double giveShearAreaY() override;
+
+    double giveShearAreaZ() override;
+    
     int computeNumberOfDofs() override { return 12; }
 
     void giveDofManDofIDMask(int inode, IntArray &) const override;
@@ -81,7 +100,7 @@ public:
     const char *giveClassName() const override { return "latticeframe3d"; }
     void initializeFrom(InputRecord &ir) override;
 
-
+    void giveInternalForcesVector(FloatArray &answer, TimeStep *tStep, int useUpdatedGpRecord) override;
 
     Element_Geometry_Type giveGeometryType() const override { return EGT_line_1; }
 

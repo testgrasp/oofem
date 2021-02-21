@@ -196,13 +196,14 @@ LatticeFrame3d :: giveLength()
 void
 LatticeFrame3d :: computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
 {
-    answer = static_cast< LatticeCrossSection * >( this->giveCrossSection() )->give3dStiffnessMatrix(rMode, gp, tStep);
+    answer =  static_cast< LatticeCrossSection * >( this->giveCrossSection() )->give3dFrameStiffnessMatrix(rMode, gp, tStep);
+
 }
 
 void
 LatticeFrame3d :: computeStressVector(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
 {
-    answer = static_cast< LatticeCrossSection * >( this->giveCrossSection() )->giveLatticeStress3d(strain, gp, tStep);
+  answer = static_cast< LatticeCrossSection * >( this->giveCrossSection() )->giveFrameForces3d(strain, gp, tStep);
 }
 
 int
@@ -235,12 +236,6 @@ LatticeFrame3d :: computeStiffnessMatrix(FloatMatrix &answer, MatResponseMode rM
     this->computeBmatrixAt(integrationRulesArray [ 0 ]->getIntegrationPoint(0), bj);
     this->computeConstitutiveMatrixAt(d, rMode, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
 
-    double volume = this->computeVolumeAround(integrationRulesArray [ 0 ]->getIntegrationPoint(0) );
-
-    for ( int i = 1; i <= 6; i++ ) {
-        d.at(i, i) *= volume;
-    }
-
     dbj.beProductOf(d, bj);
     bjt.beTranspositionOf(bj);
     answer.beProductOf(bjt, dbj);
@@ -262,19 +257,84 @@ double LatticeFrame3d :: giveArea() {
     return this->area;
 }
 
+double LatticeFrame3d :: giveIy() {
+    return this->iy;
+}
 
+double LatticeFrame3d :: giveIz() {
+    return this->iz;
+}
+
+double LatticeFrame3d :: giveIk() {
+    return this->ik;
+}
+
+double LatticeFrame3d :: giveShearAreaY() {
+    return this->shearareay;
+}
+
+double LatticeFrame3d :: giveShearAreaZ() {
+    return this->shearareaz;
+}
+
+
+  void
+LatticeFrame3d :: giveInternalForcesVector(FloatArray &answer,
+                                              TimeStep *tStep, int useUpdatedGpRecord)
+{
+  FloatMatrix b,bt;
+    FloatArray u, stress, strain;
+
+    this->computeVectorOf(VM_Total, tStep, u);
+
+    if ( initialDisplacements ) {
+        u.subtract(* initialDisplacements);
+    }
+
+    // zero answer will resize accordingly when adding first contribution
+    answer.clear();
+    
+    this->computeBmatrixAt(integrationRulesArray [ 0 ]->getIntegrationPoint(0), b);
+    bt.beTranspositionOf(b);
+    
+    if ( useUpdatedGpRecord == 1 ) {
+      LatticeMaterialStatus *lmatStat = dynamic_cast< LatticeMaterialStatus * >( integrationRulesArray [ 0 ]->getIntegrationPoint(0)->giveMaterialStatus() );
+      stress = lmatStat->giveLatticeStress();       
+    } else {
+      if ( !this->isActivated(tStep) ) {
+	strain.zero();
+	  }	  
+	  strain.beProductOf(b, u);
+	  this->computeStressVector(stress, strain, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
+        }
+	
+	answer.beProductOf(bt, stress);
+	
+	printf("strains\n");
+	strain.printYourself();
+	
+	printf("internal forces\n");
+	answer.printYourself();
+
+    // if inactive update state, but no contribution to global system
+    if ( !this->isActivated(tStep) ) {
+        answer.zero();
+        return;
+    }
+}
+
+  
+  
 bool
 LatticeFrame3d :: computeGtoLRotationMatrix(FloatMatrix &answer)
 {
     FloatMatrix lcs;
-    int i, j;
-
     answer.resize(12, 12);
     answer.zero();
 
     this->giveLocalCoordinateSystem(lcs);
-    for ( i = 1; i <= 3; i++ ) {
-        for ( j = 1; j <= 3; j++ ) {
+    for ( int i = 1; i <= 3; i++ ) {
+        for ( int j = 1; j <= 3; j++ ) {
             answer.at(i, j) = lcs.at(i, j);
             answer.at(i + 3, j + 3) = lcs.at(i, j);
             answer.at(i + 6, j + 6) = lcs.at(i, j);
@@ -290,8 +350,63 @@ int
 LatticeFrame3d :: giveLocalCoordinateSystem(FloatMatrix &answer)
 {
 
+  FloatArray lx, ly, lz, help(3);
+  Node *nodeA, *nodeB;
+  nodeA = this->giveNode(1);
+    nodeB = this->giveNode(2);
 
-  answer = this->localCoordinateSystem;
+    lx.beDifferenceOf( nodeB->giveCoordinates(), nodeA->giveCoordinates() );
+    lx.normalize();
+
+    if ( this->referenceNode ) {
+        Node *refNode = this->giveDomain()->giveNode(this->referenceNode);
+        help.beDifferenceOf( refNode->giveCoordinates(), nodeA->giveCoordinates() );
+
+        lz.beVectorProductOf(lx, help);
+        lz.normalize();
+    } else if ( this->zaxis.giveSize() > 0 ) {
+        lz = this->zaxis;
+        lz.add(lz.dotProduct(lx), lx);
+        lz.normalize();
+    } else {
+        FloatMatrix rot(3, 3);
+        double theta = referenceAngle * M_PI / 180.0;
+
+        rot.at(1, 1) = cos(theta) + pow(lx.at(1), 2) * ( 1 - cos(theta) );
+        rot.at(1, 2) = lx.at(1) * lx.at(2) * ( 1 - cos(theta) ) - lx.at(3) * sin(theta);
+        rot.at(1, 3) = lx.at(1) * lx.at(3) * ( 1 - cos(theta) ) + lx.at(2) * sin(theta);
+
+        rot.at(2, 1) = lx.at(2) * lx.at(1) * ( 1 - cos(theta) ) + lx.at(3) * sin(theta);
+        rot.at(2, 2) = cos(theta) + pow(lx.at(2), 2) * ( 1 - cos(theta) );
+        rot.at(2, 3) = lx.at(2) * lx.at(3) * ( 1 - cos(theta) ) - lx.at(1) * sin(theta);
+
+        rot.at(3, 1) = lx.at(3) * lx.at(1) * ( 1 - cos(theta) ) - lx.at(2) * sin(theta);
+        rot.at(3, 2) = lx.at(3) * lx.at(2) * ( 1 - cos(theta) ) + lx.at(1) * sin(theta);
+        rot.at(3, 3) = cos(theta) + pow(lx.at(3), 2) * ( 1 - cos(theta) );
+
+        help.at(3) = 1.0;         // up-vector
+        // here is ly is used as a temp var
+        if ( fabs( lx.dotProduct(help) ) > 0.999 ) { // Check if it is vertical
+            ly = {
+                0., 1., 0.
+            };
+        } else {
+            ly.beVectorProductOf(lx, help);
+        }
+        lz.beProductOf(rot, ly);
+        lz.normalize();
+    }
+
+    ly.beVectorProductOf(lz, lx);
+    ly.normalize();
+
+    answer.resize(3, 3);
+    answer.zero();
+    for ( int i = 1; i <= 3; i++ ) {
+        answer.at(1, i) = lx.at(i);
+        answer.at(2, i) = ly.at(i);
+        answer.at(3, i) = lz.at(i);
+    }
 
     return 1;
 }
@@ -316,6 +431,50 @@ void
 LatticeFrame3d :: initializeFrom(InputRecord &ir)
 {
     LatticeStructuralElement :: initializeFrom(ir);
+
+    referenceNode = 0;
+    referenceAngle = 0;
+    this->zaxis.clear();
+    if ( ir.hasField(_IFT_LatticeFrame3d_zaxis) ) {
+        IR_GIVE_FIELD(ir, this->zaxis, _IFT_LatticeFrame3d_zaxis);
+    } else if ( ir.hasField(_IFT_LatticeFrame3d_refnode) ) {
+        IR_GIVE_FIELD(ir, referenceNode, _IFT_LatticeFrame3d_refnode);
+        if ( referenceNode == 0 ) {
+            OOFEM_WARNING("wrong reference node specified. Using default orientation.");
+        }
+    } else if ( ir.hasField(_IFT_LatticeFrame3d_refangle) ) {
+        IR_GIVE_FIELD(ir, referenceAngle, _IFT_LatticeFrame3d_refangle);
+    } else {
+        throw ValueInputException(ir, _IFT_LatticeFrame3d_zaxis, "axis, reference node, or angle not set");
+    }
+
+    this->area = 0.;
+    IR_GIVE_OPTIONAL_FIELD(ir, area, _IFT_LatticeCrossSection_area);
+
+    this->iy = 0.;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->iy, _IFT_LatticeCrossSection_iy);
+
+    this->iz = 0.0;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->iz, _IFT_LatticeCrossSection_iz);
+    
+    this->ik = 0.0;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->ik, _IFT_LatticeCrossSection_ik);
+
+    double beamshearcoeff = 0.0;
+    IR_GIVE_OPTIONAL_FIELD(ir, beamshearcoeff, _IFT_LatticeCrossSection_shearcoeff);
+
+    this->shearareay = 0.0;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->shearareay, _IFT_LatticeCrossSection_shearareay);
+    if ( this->shearareay == 0.0 ) {
+        this->shearareay = beamshearcoeff * area;
+    }
+
+    this->shearareaz = 0.0;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->shearareaz, _IFT_LatticeCrossSection_shearareaz);
+    if ( this->shearareaz == 0.0 ) {
+        this->shearareaz = beamshearcoeff * area;
+    }    
+    
 }
 
 

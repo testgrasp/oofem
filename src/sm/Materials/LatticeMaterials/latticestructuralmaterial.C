@@ -116,6 +116,14 @@ LatticeStructuralMaterial :: giveLatticeStress3d(const FloatArrayF< 6 > &strain,
     OOFEM_ERROR("3dLattice mode not supported");
 }
 
+FloatArrayF< 6 >
+LatticeStructuralMaterial :: giveFrameForces3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep)
+{
+    OOFEM_ERROR("3dFrame mode not supported");
+}
+
+
+  
 FloatMatrixF< 1, 1 >
 LatticeStructuralMaterial :: give1dLatticeStiffnessMatrix(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
 //
@@ -142,4 +150,14 @@ LatticeStructuralMaterial :: give3dLatticeStiffnessMatrix(MatResponseMode mode, 
 {
     OOFEM_ERROR("No general implementation provided");
 }
+
+FloatMatrixF< 6, 6 >
+LatticeStructuralMaterial :: give3dFrameStiffnessMatrix(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
+//
+// return material stiffness matrix for 2dlattice
+//
+{
+    OOFEM_ERROR("No general implementation provided");
+}
+  
 } // end namespace oofem

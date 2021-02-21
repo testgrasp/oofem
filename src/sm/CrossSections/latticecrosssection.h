@@ -43,7 +43,14 @@
 //@{
 #define _IFT_LatticeCrossSection_Name "latticecs"
 #define _IFT_LatticeCrossSection_Material "material"
-#define _IFT_LatticeCrossSection_thickness "thickness"
+#define _IFT_LatticeCrossSection_area "area"
+#define _IFT_LatticeCrossSection_iy "iy"
+#define _IFT_LatticeCrossSection_iz "iz"
+#define _IFT_LatticeCrossSection_ik "ik"
+#define _IFT_LatticeCrossSection_shearcoeff "shearcoeff"
+#define _IFT_LatticeCrossSection_shearareay "shearareay"
+#define _IFT_LatticeCrossSection_shearareaz "shearareaz"
+#define _IFT_LatticeCrossSection_MaterialNumber "material"
 //@}
 
 namespace oofem {
@@ -60,7 +67,18 @@ typedef GaussPoint IntegrationPoint;
  */
 class LatticeCrossSection : public CrossSection
 {
-public:
+ protected:
+  int materialNumber = 0; ///< Material number
+  double area = 0.;
+  double iy = 0.;
+  double iz = 0.;
+  double ik = 0.;
+  double beamshearcoeff =0.;
+  double shearareay = 0.;
+  double shearareaz = 0.;
+  
+  
+ public:
     /**
      * Constructor. Creates cross section with given number, belonging to given domain.
      * @param n Cross section number.
@@ -75,7 +93,7 @@ public:
     virtual ~LatticeCrossSection() { }
 
     void initializeFrom(InputRecord &ir) override;
-
+    
     int testCrossSectionExtension(CrossSectExtension ext) override { return this->crossSectionType; }
 
     /**
@@ -94,18 +112,22 @@ public:
      */
     //@{
     // Pass all calls to the material
-
+    
     double giveLatticeStress1d(double strain, GaussPoint *gp, TimeStep *tStep) const;
 
     FloatArrayF< 3 >giveLatticeStress2d(const FloatArrayF< 3 > &strain, GaussPoint *gp, TimeStep *tStep) const;
 
     FloatArrayF< 6 >giveLatticeStress3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep) const;
 
+    FloatArrayF< 6 >giveFrameForces3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep) const;
+
     FloatMatrixF< 1, 1 >give1dStiffnessMatrix(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const;
 
     FloatMatrixF< 3, 3 >give2dStiffnessMatrix(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const;
 
     FloatMatrixF< 6, 6 >give3dStiffnessMatrix(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const;
+
+    FloatMatrixF< 6, 6 >give3dFrameStiffnessMatrix(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const;
     //@}
 
     LatticeStructuralMaterial *giveLatticeMaterial() const;

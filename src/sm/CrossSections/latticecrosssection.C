@@ -35,6 +35,9 @@
 #include "latticecrosssection.h"
 #include "sm/Materials/LatticeMaterials/latticematstatus.h"
 #include "sm/Materials/LatticeMaterials/latticestructuralmaterial.h"
+#include "dynamicinputrecord.h"
+#include "datastream.h"
+#include "contextioerr.h"
 #include "gausspoint.h"
 #include "element.h"
 #include "floatarray.h"
@@ -67,13 +70,12 @@ void
 LatticeCrossSection :: initializeFrom(InputRecord &ir)
 {
     CrossSection :: initializeFrom(ir);
+
     IR_GIVE_FIELD(ir, this->materialNum, _IFT_LatticeCrossSection_Material);
 
-    double thickness = 0.0;
-    if ( ir.hasField(_IFT_LatticeCrossSection_thickness) ) {
-        IR_GIVE_OPTIONAL_FIELD(ir, thickness, _IFT_LatticeCrossSection_thickness);
-        propertyDictionary.add(CS_Thickness, thickness);
-    }
+    this->materialNumber = 0;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->materialNumber, _IFT_LatticeCrossSection_MaterialNumber);
+
 }
 
 double LatticeCrossSection :: giveLatticeStress1d(double strain, GaussPoint *gp, TimeStep *tStep) const
@@ -91,7 +93,13 @@ FloatArrayF< 6 >LatticeCrossSection :: giveLatticeStress3d(const FloatArrayF< 6 
     return this->giveLatticeMaterial()->giveLatticeStress3d(strain, gp, tStep);
 }
 
+  FloatArrayF< 6 >LatticeCrossSection :: giveFrameForces3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep) const
+  {
+    // Get the forces divided by the sectional properties from material 
+    return  this->giveLatticeMaterial()->giveFrameForces3d(strain, gp, tStep);
+  }
 
+  
 
 FloatMatrixF< 1, 1 >
 LatticeCrossSection :: give1dStiffnessMatrix(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
@@ -126,7 +134,14 @@ LatticeCrossSection :: give3dStiffnessMatrix(MatResponseMode rMode, GaussPoint *
     }
 }
 
-
+FloatMatrixF< 6, 6 >
+LatticeCrossSection :: give3dFrameStiffnessMatrix(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
+{
+    LatticeStructuralMaterial *mat = this->giveLatticeMaterial();
+    return mat->give3dFrameStiffnessMatrix(rMode, gp, tStep);    
+}
+  
+  
 int
 LatticeCrossSection :: giveIPValue(FloatArray &answer, GaussPoint *ip, InternalStateType type, TimeStep *tStep)
 {
